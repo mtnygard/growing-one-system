@@ -1,0 +1,4 @@
+{:paths   ["src" "resources"]
+ :deps    {com.cognitect/pedestal.vase  {:mvn/version "0.9.4-SNAPSHOT"}}
+ :aliases {:run {:main-opts ["-m" "gos.main" "src/config.fern"]
+                 :jvm-opts ["--add-modules" "java.xml.bind"]}}}

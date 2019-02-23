@@ -1,0 +1,19 @@
+{vase/service (fern/lit vase/service
+                {:apis        [@api-v1]
+                 :service-map @http-options})
+
+ http-options {:io.pedestal.http/resource-path  "/public"
+               :io.pedestal.http/port           8999
+               :io.pedestal.http/join?          (fern/eval (not= :development @environment))
+               :io.pedestal.http/secure-headers {:content-security-policy-settings
+                                                 {:object-src "none"}}}
+
+ api-v1       (fern/lit vase/api
+                {:path          "/v1"
+                 :expose-api-at "/v1/api.edn"
+                 :on-request    [io.pedestal.http/json-body]
+                 :routes        @api-v1/routes})
+
+ environment  :development
+
+ api-v1/routes #{["/hello" :get (fern/lit vase/respond {:body {:message "Hi there"}})]}}
