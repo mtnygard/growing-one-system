@@ -8,13 +8,19 @@ Knowledge management system
 
 We use [Pre-commit](https://pre-commit.com/) to manage a lot of
 housekeeping tasks. Install it with pip, then install the hooks in
-your copy of the repo
+your copy of the repo:
 
     pip install pre-commit
     pre-commit install
 
 This uses the definition in `.pre-commit-config.yaml` to set up all
 the necessary git-machinery in your clone.
+
+The first time the hooks run, it takes a while to record the
+repository's environment. If you want to get that out of the way
+early, you can run the hooks once manually:
+
+    pre-commit run --all-files
 
 ## Front end
 
