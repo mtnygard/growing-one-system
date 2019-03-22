@@ -28,7 +28,7 @@ We use [Shadow-cljs](http://shadow-cljs.org/) to build. Install it
 locally with [Yarn](https://yarnpkg.com/en/docs/install):
 
     cd front-end
-    yarn
+    yarn && yarn html
     yarn shadow-cljs watch app
 
 This provides ClojureScript compilation with hot reloading. It runs a
