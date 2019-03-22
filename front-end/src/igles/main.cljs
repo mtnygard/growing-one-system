@@ -12,10 +12,10 @@
 (devtools/install!)
 (enable-console-print!)
 
-(rf/dispatch-sync [:initialize-db])
 
 (defn ^:export init []
   (println "[main]: loading")
+  (rf/dispatch-sync [:initialize-db])
   (reagent/render [igles.views/capture-app]
     (.getElementById js/document "app")))
 
