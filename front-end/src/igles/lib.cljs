@@ -1,4 +1,4 @@
-(ns app.lib)
+(ns igles.lib)
 
 (println "[lib] loading")
 
