@@ -3,7 +3,7 @@
                  :service-map @http-options})
 
  http-options {:io.pedestal.http/resource-path  "/public"
-               :io.pedestal.http/port           8999
+               :io.pedestal.http/port           3000
                :io.pedestal.http/join?          (fern/eval (not= :development @environment))
                :io.pedestal.http/secure-headers {:content-security-policy-settings
                                                  {:object-src "none"}}}
