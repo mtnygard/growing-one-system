@@ -3,7 +3,7 @@
             [re-frame.core :as rf]
             [devtools.core :as devtools]
             [reagent.core :as reagent]
-            [igles.views]
+            [igles.views :as views]
             [igles.events]
             [igles.subs]))
 
@@ -12,13 +12,15 @@
 (devtools/install!)
 (enable-console-print!)
 
+(defn mount-root []
+  (reagent/render [views/capture-app]
+    (.getElementById js/document "app")))
 
 (defn ^:export init []
   (println "[main]: loading")
   (rf/dispatch-sync [:initialize-db])
-  (reagent/render [igles.views/capture-app]
-    (.getElementById js/document "app")))
+  (mount-root))
 
 (defn ^:export reload!
   []
-  nil)
+  (mount-root))

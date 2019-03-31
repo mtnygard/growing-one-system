@@ -1,3 +1,3 @@
 (ns igles.db)
 
-(def initial-value {})
+(def initial-value {:counter 0})
