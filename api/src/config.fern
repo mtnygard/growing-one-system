@@ -4,16 +4,27 @@
 
  http-options {:io.pedestal.http/resource-path  "/public"
                :io.pedestal.http/port           3000
-               :io.pedestal.http/join?          (fern/eval (not= :development @environment))
+               :io.pedestal.http/join?          false
                :io.pedestal.http/secure-headers {:content-security-policy-settings
                                                  {:object-src "none"}}}
 
- api-v1       (fern/lit vase/api
-                {:path          "/v1"
-                 :expose-api-at "/v1/api.edn"
-                 :on-request    [io.pedestal.http/json-body]
-                 :routes        @api-v1/routes})
+ api-v1 (fern/lit vase/api
+          {:path          "/v1"
+           :expose-api-at "/v1/api.edn"
+           :on-startup    [@datomic-cloud]
+           :on-request    [@datomic-cloud io.pedestal.http/json-body]
+           :routes        @api-v1/routes})
 
- environment  :development
+ datomic-cloud (fern/lit vase.datomic.cloud/client @client-config "development")
 
- api-v1/routes #{["/hello" :get (fern/lit vase/respond {:body {:message "Hi there"}})]}}
+ client-config {:server-type   :ion
+                :region        "us-east-2"
+                :system        "nygard-solo-dev"
+                :creds-profile "gos"
+                :endpoint      "http://entry.nygard-solo-dev.us-east-2.datomic.net:8182/"
+                :proxy-port    8182}
+
+ environment :development
+
+ api-v1/routes #{["/hello" :get (fern/lit vase/respond {:body {:message "Hi there"}})]
+                 ["/v0/attributes" :get (fern/lit vase.datomic.cloud/query {:query [:find (pull ?e [*]) :where [?e :db/valueType]]})]}}
