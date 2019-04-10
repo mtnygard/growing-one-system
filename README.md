@@ -39,3 +39,9 @@ assets.
 
 The API layer is built with Clojure. Install it on Linux, macOS, or
 WSL according to the [instructions at Clojure.org](https://clojure.org/guides/getting_started).
+
+## Atomist
+
+A variety of housekeeping tasks will be performed by "software delivery machines" created using [Atomist](atomist.com). See the repositories under [Igg-less](https://github.com/igg-less) for details.
+
+You won't be able to run these machines directly. They're part of the infrastructure for running the main project and site.
