@@ -15,5 +15,6 @@
                       :compiler-options {:closure-defines {"goog.DEBUG"                                 true
                                                            "re_frame.trace.trace_enabled_QMARK_"        true
                                                            "day8.re_frame.tracing.trace_enabled_QMARK_" true}}
-                      :devtools         {:preloads   [day8.re-frame-10x.preload]
+                      :devtools         {:preloads   [day8.re-frame-10x.preload
+                                                      devtools.preload]
                                          :after-load igles.main/reload!}}}}
