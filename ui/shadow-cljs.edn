@@ -14,7 +14,6 @@
                       :modules          {:main {:init-fn igles.main/init}}
                       :compiler-options {:closure-defines {"goog.DEBUG"                                 true
                                                            "re_frame.trace.trace_enabled_QMARK_"        true
-                                                           "day8.re_frame.tracing.trace_enabled_QMARK_" true}
-                                         :optimizations   :none}
+                                                           "day8.re_frame.tracing.trace_enabled_QMARK_" true}}
                       :devtools         {:preloads   [day8.re-frame-10x.preload]
                                          :after-load igles.main/reload!}}}}
