@@ -1,4 +1,6 @@
-{vase/service (fern/lit vase/service
+{vase/plugins [gos.scores]
+
+ vase/service (fern/lit vase/service
                 {:apis        [@api-v1]
                  :service-map @http-options})
 
@@ -12,7 +14,8 @@
           {:path          "/v1"
            :expose-api-at "/v1/api.edn"
            :on-startup    [@datomic-cloud]
-           :on-request    [@datomic-cloud io.pedestal.http/json-body]
+           :on-request    [@datomic-cloud
+                           @io.pedestal.http/transit-json-body]
            :routes        @api-v1/routes})
 
  datomic-cloud (fern/lit vase.datomic.cloud/client @client-config "development")
@@ -26,5 +29,10 @@
 
  environment :development
 
- api-v1/routes #{["/hello" :get (fern/lit vase/respond {:body {:message "Hi there"}})]
-                 ["/v0/attributes" :get (fern/lit vase.datomic.cloud/query {:query [:find (pull ?e [*]) :where [?e :db/valueType]]})]}}
+ api-v1/routes  #{["/hello"      :get  (fern/lit vase/respond {:body {:message "Hi there"}})]
+                  ["/scores"     :post [@io.pedestal.http.body-params/body-params
+                                        gos.scores/post]]
+                  ["/attributes" :get  @get-attributes]}
+
+ get-attributes (fern/lit vase.datomic.cloud/query {:query [:find (pull ?e [*]) :where [?e :db/valueType]]})
+ }

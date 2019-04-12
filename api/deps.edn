@@ -1,4 +1,8 @@
 {:paths   ["src" "resources"]
- :deps    {com.cognitect/pedestal.vase {:local/root "../../../vase"}}
- :aliases {:run {:main-opts ["-m" "gos.main" "src/config.fern"]
-                 :jvm-opts ["--add-modules" "java.xml.bind"]}}}
+ :deps    {com.cognitect/pedestal.vase {:local/root "../../vase"}}
+ :aliases {:dev {:main-opts   ["-m" "frenpl"]
+                 :extra-paths ["dev"]
+                 :extra-deps  {frenpl {:git/url "https://gist.github.com/mtnygard/9b2dd3c88b3309d82210b84f33ee954d"
+                                       :sha      "18113ffd8fc706aec04c36ed678cdc5144b72325"}}}
+           :run {:main-opts ["-m" "gos.main" "src/config.fern"]
+                 :jvm-opts  ["--add-modules" "java.xml.bind"]}}}

@@ -12,3 +12,11 @@ Start it up with:
 Try it out with curl:
 
 `curl -i http://localhost:8999/v1/hello`
+
+# Development Mode
+
+When developing, it's more friendly to use
+
+`clj -A:dev`
+
+This starts a well-equipped REPL on port 7888.

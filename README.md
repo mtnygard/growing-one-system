@@ -45,3 +45,5 @@ WSL according to the [instructions at Clojure.org](https://clojure.org/guides/ge
 A variety of housekeeping tasks will be performed by "software delivery machines" created using [Atomist](atomist.com). See the repositories under [Igg-less](https://github.com/igg-less) for details.
 
 You won't be able to run these machines directly. They're part of the infrastructure for running the main project and site.
+
+# Try this out
