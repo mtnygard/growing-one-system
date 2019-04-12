@@ -6,4 +6,5 @@
   [:div
    [:h1 "This is here."]
    [:p (str "Clicked " @(rf/subscribe [:counter]) " times")]
-   [:button {:on-click #(rf/dispatch [:counter-clicked])} "Click This!"]])
+   [:button {:on-click #(rf/dispatch [:counter-clicked])} "Click This!"]
+   [:button {:on-click #(rf/dispatch [:submit-score])} "Submit your score"]])
