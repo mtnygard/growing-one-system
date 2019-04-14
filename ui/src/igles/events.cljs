@@ -10,14 +10,14 @@
 
 (rf/reg-event-fx :counter-clicked
   (fn-traced [{:keys [db]} _]
-    {:db (update db :counter inc)}))
+    {:db (db/increment-counter db)}))
 
 (rf/reg-event-fx :submit-score
   (fn-traced [{:keys [db]} _]
-    {:db         (assoc db :submit-enabled false)
+    {:db         (db/disable-submit db)
      :http-xhrio {:method          :post
                   :uri             "/v1/scores"
-                  :params          {:payload [{"user/score" (:counter db)}]}
+                  :params          {:payload [{"user/score" (db/counter db)}]}
                   :timeout         8000
                   :format          (ajax/json-request-format)
                   :response-format (ajax/json-response-format)
@@ -26,9 +26,8 @@
 
 (rf/reg-event-fx :score-submitted
   (fn-traced [{:keys [db]} _]
-    {:db (assoc db :submit-enabled true)}))
+    {:db (db/enable-submit db)}))
 
 (rf/reg-event-fx :submit-score-failed
   (fn-traced [{:keys [db]} response]
-    (println response)
-    {:db (assoc db :submit-enabeld true)}))
+    {:db (db/enable-submit db)}))
