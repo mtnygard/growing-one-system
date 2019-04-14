@@ -16,11 +16,11 @@
   (fn-traced [{:keys [db]} _]
     {:db         (assoc db :submit-enabled false)
      :http-xhrio {:method          :post
-                  :uri             "/scores"
-                  :params          {:score (:counter db)}
+                  :uri             "/v1/scores"
+                  :params          {:payload [{"user/score" (:counter db)}]}
                   :timeout         8000
-                  :format          (ajax/transit-request-format)
-                  :response-format (ajax/transit-response-format)
+                  :format          (ajax/json-request-format)
+                  :response-format (ajax/json-response-format)
                   :on-success      [:score-submitted]
                   :on-failure      [:submit-score-failed]}}))
 

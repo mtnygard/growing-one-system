@@ -13,7 +13,7 @@
  api-v1 (fern/lit vase/api
           {:path          "/v1"
            :expose-api-at "/v1/api.edn"
-           :on-startup    [@datomic-cloud]
+           :on-startup    [@datomic-cloud @scores-attrs]
            :on-request    [@datomic-cloud
                            @io.pedestal.http/transit-json-body]
            :routes        @api-v1/routes})
@@ -29,10 +29,14 @@
 
  environment :development
 
- api-v1/routes  #{["/hello"      :get  (fern/lit vase/respond {:body {:message "Hi there"}})]
-                  ["/scores"     :post [@io.pedestal.http.body-params/body-params
-                                        gos.scores/post]]
-                  ["/attributes" :get  @get-attributes]}
+ api-v1/routes #{["/hello"      :get  (fern/lit vase/respond {:body {:message "Hi there"}})]
+                 ["/scores"     :post [@io.pedestal.http.body-params/body-params
+                                       (fern/lit vase.datomic.cloud/transact {:name       :post-scores
+                                                                              :properties [:user/score]})]]
+                 ["/scores" :get (fern/lit vase.datomic.cloud/query {:name  :get-scores
+                                                                     :query [:find (pull ?e [*]) :where [?e :user/score]]})]}
 
- get-attributes (fern/lit vase.datomic.cloud/query {:query [:find (pull ?e [*]) :where [?e :db/valueType]]})
+ scores-attrs (fern/lit vase.datomic.cloud/attributes
+                [:user/score :one :long "The user's score"])
+
  }

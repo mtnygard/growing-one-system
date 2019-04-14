@@ -1,7 +1,6 @@
 (ns gos.scores
-  (:require [gos.responses :as responses :refer [ok]]
-            [io.pedestal.interceptor :as i]
-            [puget.printer :refer [cprint]]))
+  (:require [gos.responses :as responses :refer [ok bad-request]]
+            [io.pedestal.interceptor :as i]))
 
 (def post
   (i/interceptor
