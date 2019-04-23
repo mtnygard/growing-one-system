@@ -2,6 +2,7 @@
   (:require [igles.lib :as lib]
             [re-frame.core :as rf]
             [reagent.core :as reagent]
+            [day8.re-frame.http-fx]
             [igles.routes :as routes]
             [igles.views :as views]
             [igles.events]
