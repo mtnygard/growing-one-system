@@ -3,7 +3,7 @@
 Back end for knowledge capture system described in the book [Growing
 One System](https://leanpub.com/growing-one-system).
 
-# Usage
+## Usage
 
 Start it up with:
 
@@ -13,7 +13,7 @@ Try it out with curl:
 
 `curl -i http://localhost:8999/v1/hello`
 
-# Development Mode
+## Development Mode
 
 When developing, it's more friendly to use
 
