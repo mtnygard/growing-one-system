@@ -3,25 +3,32 @@
             [re-frame.core :as rf]
             [igles.util :refer [<sub]]))
 
-(defn +class [v cl]
+(defn +class
+  "Add a CSS class to the given element."
+  [v cl]
   (let [[tag & more] v
-        _            (println "first more " (first more))
-
         opts         (if (map? (first more)) (first more) {})
         more         (if (map? (first more)) (rest more) more)]
-    (println "opts " opts)
     (apply vector tag (update opts :class conj cl) more)))
 
-(defn +classes [v cls]
-  (println "classes " cls)
-  (println "type of v " (type v))
-  (let [result (reduce +class v cls)]
-    (println " result " result)
-    result))
+(defn +classes
+  "Add multiple CSS classes to the given element"
+  [v cls]
+  (reduce +class v cls))
 
-;;
-;; Navbar component
-;;
+(defn variant
+  "Return a function that is like f but also adds the given class. Useful for families of items (like buttons) in Bootstrap."
+  [f cl]
+  (let [modifier (if (coll? cl) +classes +class)]
+    (fn [& c]
+      (modifier (f c) cl))))
+
+
+;
+; Navbar component
+;
+
+
 (defn navbar-dropdown-menu [title & items]
   (let [id (str/lower-case title)]
     [:li.nav-item.dropdown
@@ -89,6 +96,9 @@
         c    (if (map? (first c)) (rest c) c)]
     (apply vector :div.title opts c)))
 
+(defn h1 [s]
+  [:h1 s])
+
 (defn h2 [s]
   [:h2.heading-semi-black s])
 
@@ -104,17 +114,12 @@
 (defn button [c]
   (apply vector :button.btn c))
 
-(defn button-primary [& c]
-  (+class (button c) "btn-primary"))
-
-(defn button-outline [& c]
-  (+class (button c) "btn-outline-primary"))
-
-(defn button-round [& c]
-  (+classes (button c) ["btn-primary" "btn-round"]))
-
-(defn button-link [& c]
-  (+class (button c) "btn-link"))
+(def button-primary   (variant button "btn-primary"))
+(def button-secondary (variant button "btn-secondary"))
+(def button-outline   (variant button "btn-outline-primary"))
+(def button-link      (variant button "btn-link"))
+(def button-round     (variant button ["btn-primary" "btn-round"]))
+(def button-circle    (variant button ["btn-primary" "btn-circle"]))
 
 ;;
 ;; Build the actual UI
@@ -126,11 +131,11 @@
 (defn capture-panel
   []
   [:div
-   [:h1 "This is here."]
-   [:p (str "Clicked " @(rf/subscribe [:counter]) " times")]
-   [:button {:on-click #(rf/dispatch [:counter-clicked])} "Click This!"]
-   [:button {:disabled (not (<sub :can-submit?))
-             :on-click #(rf/dispatch [:submit-score])} "Submit your score"]])
+   [h1 "Count Clicker"]
+   [muted (str "Clicked " @(rf/subscribe [:counter]) " times")]
+   [button-primary {:on-click #(rf/dispatch [:counter-clicked])} "Click This!"]
+   [button-secondary {:disabled (not (<sub :can-submit?))
+                      :on-click #(rf/dispatch [:submit-score])} "Submit your score"]])
 
 (def ^:private view->panel
   {:capture [capture-panel]})
@@ -170,7 +175,7 @@
        [button-outline "Outline"]
        [button-round "Round"]
        [button-round [:em.ion-android-checkmark-circle] "with icon"]
-       [button-round [:em.ion-power]]
+       [button-circle [:em.ion-power]]
        [button-link "Link"]]
       [+class [title [muted "Multiple Sizes"]] "mt5"]
 
