@@ -1,7 +1,124 @@
 (ns igles.views
-  (:require [re-frame.core :as rf]
+  (:require [clojure.string :as str]
+            [re-frame.core :as rf]
             [igles.util :refer [<sub]]))
 
+(defn +class [v cl]
+  (let [[tag & more] v
+        _            (println "first more " (first more))
+
+        opts         (if (map? (first more)) (first more) {})
+        more         (if (map? (first more)) (rest more) more)]
+    (println "opts " opts)
+    (apply vector tag (update opts :class conj cl) more)))
+
+(defn +classes [v cls]
+  (println "classes " cls)
+  (println "type of v " (type v))
+  (let [result (reduce +class v cls)]
+    (println " result " result)
+    result))
+
+;;
+;; Navbar component
+;;
+(defn navbar-dropdown-menu [title & items]
+  (let [id (str/lower-case title)]
+    [:li.nav-item.dropdown
+     [:a.nav-link.dropdown-toggle {:id            id
+                                   :href          "#"
+                                   :data-toggle   "dropdown"
+                                   :aria-haspopup "true"
+                                   :aria-expanded "false"} title]
+     (let [->hic        (fn [x] (let [href  (if (vector? x) (second x) (str "#" (str/lower-case x)))
+                                      title (if (vector? x) (first x) x)]
+                                  [:a.dropdown-item.page-scroll {:href href} title]))
+           hiccup-items (map ->hic items)]
+       (apply vector :div.dropdown-menu {:aria-labelledby id} hiccup-items))]))
+
+(defn navbar-toplevel-item [& xs]
+  (let [opts  (if (map? (first xs)) (first xs) {})
+        title (if (map? (first xs)) (second xs) (first xs))
+        opts  (merge {:href (str "#" (str/lower-case title))} opts)]
+    [:li.nav-item [:a.nav-link.page-scroll opts title]]))
+
+(defn navbar-clickable-logo [src]
+  [:a.navbar-brand {:href "#"}
+   [:img.nav-brand-logo {:src src}]])
+
+(defn navbar-compressed-icon [collapse-target icon-class]
+  [:button.navbar-toggler.navbar-toggler-right {:data-toggle   "collapse"
+                                                :data-target   (str "#" collapse-target)
+                                                :aria-controls collapse-target
+                                                :aria-expanded "false"
+                                                :aria-label    "Toggle navigation"}
+   [:span {:class icon-class}]])
+
+(defn- navclasses [scroll-top]
+  (if (>= 200 scroll-top)
+    ["navbar" "navbar-toggleable-md" "fixed-top" "sticky-navigation-alt" "navbar-transparent"]
+    ["navbar" "navbar-toggleable-md" "fixed-top" "sticky-navigation-alt" "bg-inverse" "navbar-raised"]))
+
+(defn navbar-contents [collapse-target contents]
+  [:div.collapse.navbar-collapse
+   {:id collapse-target}
+   (apply vector :ul.navbar-nav.ml-auto contents)])
+
+(defn navbar [& items]
+  [:nav
+   [navbar-compressed-icon "navbarCollapse" "ion-grid"]
+   [navbar-clickable-logo "img/logo-w60.png"]
+   [navbar-contents "navbarCollapse" items]])
+
+;;
+;; Layout
+;;
+(defn content-section [classes & blocks]
+  [:section.colored-section {:class classes}
+   (apply vector :div.container blocks)])
+
+(defn row-full-width [& contents]
+  [:div.row
+   (apply vector :div.col-md-8.offset-md-2 contents)])
+
+;;
+;; Typography
+;;
+(defn title [& c]
+  (let [opts (if (map? (first c)) (first c) {})
+        c    (if (map? (first c)) (rest c) c)]
+    (apply vector :div.title opts c)))
+
+(defn h2 [s]
+  [:h2.heading-semi-black s])
+
+(defn h3 [s]
+  [:h3 s])
+
+(defn muted [s]
+  [:p.lead.text-muted s])
+
+;;
+;; Buttons
+;;
+(defn button [c]
+  (apply vector :button.btn c))
+
+(defn button-primary [& c]
+  (+class (button c) "btn-primary"))
+
+(defn button-outline [& c]
+  (+class (button c) "btn-outline-primary"))
+
+(defn button-round [& c]
+  (+classes (button c) ["btn-primary" "btn-round"]))
+
+(defn button-link [& c]
+  (+class (button c) "btn-link"))
+
+;;
+;; Build the actual UI
+;;
 (defn unavailable []
   ;; can't do anything, just put empty content.
   [:div])
@@ -22,74 +139,44 @@
   (let [route (<sub :active-route)]
     (view->panel (:view (:data route)) unavailable)))
 
-(defn- navclasses [scroll-top]
-  (if (>= 200 scroll-top)
-    ["navbar" "navbar-toggleable-md" "fixed-top" "sticky-navigation-alt" "navbar-transparent"]
-    ["navbar" "navbar-toggleable-md" "fixed-top" "sticky-navigation-alt" "bg-inverse" "navbar-raised"]))
-
-(defn navbar [scroll-top]
-  [:nav {:class (navclasses scroll-top)}
-   [:button.navbar-toggler.navbar-toggler-right {:data-toggle   "collapse"
-                                                 :data-target   "#navbarCollapse"
-                                                 :aria-controls "navbarCollapse"
-                                                 :aria-expanded "false"
-                                                 :aria-label    "Toggle navigation"}
-    [:span.ion-grid]]
-   [:a.navbar-brand {:href "#"}
-    [:img.nav-brand-logo {:src "img/logo-w60.png"}]]
-   [:div.collapse.navbar-collapse {:id "navbarCollapse"}
-    [:ul.navbar-nav.ml-auto
-     [:li.nav-item.dropdown
-      [:a.nav-link.dropdown-toggle {:id            "components"
-                                    :href          "#"
-                                    :data-toggle   "dropdown"
-                                    :aria-haspopup "true"
-                                    :aria-expanded "false"}
-       "Components"]
-      [:div.dropdown-menu {:aria-labelledby "components"}
-       [:a.dropdown-item.page-scroll {:href "#buttons"} "Buttons"]
-       [:a.dropdown-item.page-scroll {:href "#forms"} "Forms"]
-       [:a.dropdown-item.page-scroll {:href "#navigation"} "Navigation"]
-       [:a.dropdown-item.page-scroll {:href "#progress-pills"} "Progress / Nav Pills"]]]
-     [:li.nav-item [:a.nav-link.page-scroll {:href "#icons"} "Icons"]]
-     [:li.nav-item [:a.nav-link.page-scroll {:href "#download"} "Download"]]
-     [:li.nav-item [:a.nav-link {:target "_blank"
-                                 :href   "examples/landing-page.html"} "Example"]]]]])
-
 (defn main-view
   []
   [:<>
-   [navbar (<sub :scroll-top)]
+   (+classes
+    (navbar
+     [navbar-dropdown-menu "Components"
+      "Buttons"
+      "Forms"
+      "Navigation"
+      ["Progress / Nav Pills" "#progress-pills"]]
+     [navbar-toplevel-item "Icons"]
+     [navbar-toplevel-item "Download"]
+     [navbar-toplevel-item {:target "_blank"
+                            :href   "examples/landing-page.html"} "Example"])
+    (navclasses (<sub :scroll-top)))
+
    [:div.wrapper
-    [:section.colored-section.hero-header
-     [:div.container
-      [:div.row
-       [:div.col-md-8.offset-md-2
-        [active-route]]]]]
-    [:section.colored-section.bg-inverse
-     [:div.container
-      [:div.title
-       [:h2.heading-semi-black "Basic Components"]]
-      [:div {:id "buttons"}
-       [:div.title
-        [:h3 "Buttons"]
-        [:p.lead.text-muted "Multiple Styles"]]
-       [:div.row
-        [:div.col-md-8.offset-md-2
-         [:button.btn.btn-primary "Default"]
-         [:button.btn.btn-outline-primary "Outline"]
-         [:button.btn.btn-primary.btn-round "Round"]
-         [:button.btn.btn-primary.btn-round [:em.ion-android-checkmark-circle] "with icon"]
-         [:button.btn.btn-primary.btn-round [:em.ion-power]]
-         [:button.btn.btn-link "Link"]]]
-       [:div.title.mt-5
-        [:p.lead.text-muted "Multiple Sizes"]]
-       [:div.row
-        [:div.col-md-8.offset-md-2
-         [:div.btn.btn-primary.btn-xs "Extra Small"]
-         [:div.btn.btn-primary.btn-sm "Small"]
-         [:div.btn.btn-primary "Regular"]
-         [:div.btn.btn-primary.btn-md "Medium"]
-         [:div.btn.btn-primary.btn-lg "Large"]]]]]]]])
 
+    [content-section ["hero-header"]
+     [row-full-width [active-route]]]
 
+    [content-section ["bg-inverse"]
+     [title [h2 "Basic Components"]]
+     [:div {:id "buttons"}
+      [title [h3 "Buttons"]
+       [muted "Multiple Styles"]]
+      [row-full-width
+       [button-primary "Default 2"]
+       [button-outline "Outline"]
+       [button-round "Round"]
+       [button-round [:em.ion-android-checkmark-circle] "with icon"]
+       [button-round [:em.ion-power]]
+       [button-link "Link"]]
+      [+class [title [muted "Multiple Sizes"]] "mt5"]
+
+      [row-full-width
+       [+class [button-primary "Extra Small"] "btn-xs"]
+       [+class [button-primary "Small"] "btn-sm"]
+       [button-primary "Regular"]
+       [+class [button-primary "Medium"] "btn-md"]
+       [+class [button-primary "Large"] "btn-lg"]]]]]])
