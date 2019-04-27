@@ -7,7 +7,7 @@
     "watch": "shadow-cljs watch app",
     "compile": "shadow-cljs compile app",
     "release": "shadow-cljs release app",
-    "html": "mkdir -p target && cp assets/index.html target/",
+    "html": "mkdir -p target && cp -r assets/* target/",
     "serve": "yarn html && http-server target/",
     "del": "rm -r target/*",
     "build": "yarn release && yarn html && yarn serve"

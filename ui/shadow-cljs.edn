@@ -1,6 +1,7 @@
-{:source-paths ["src"]
+{:source-paths ["src/cljs"]
  :dependencies [[reagent "0.8.1"]
                 [re-frame "0.10.6"]
+                [metosin/reitit-frontend "0.3.1"]
                 [binaryage/devtools "0.9.10"]
                 [thheller/shadow-cljsjs "0.0.16"]
                 [day8.re-frame/http-fx "0.1.6"]
