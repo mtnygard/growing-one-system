@@ -1,22 +1,21 @@
-{vase/plugins [gos.scores]
+{vase/plugins  [gos.scores]
 
- vase/service (fern/lit vase/service
-                {:apis        [@api-v1]
-                 :service-map @http-options})
+ vase/service  (fern/lit vase/service
+                         {:apis        [@api-v1]
+                          :service-map @http-options})
 
- http-options {:io.pedestal.http/resource-path  "/public"
-               :io.pedestal.http/port           3000
-               :io.pedestal.http/join?          false
-               :io.pedestal.http/secure-headers {:content-security-policy-settings
-                                                 {:object-src "none"}}}
+ http-options  {:io.pedestal.http/resource-path  "/public"
+                :io.pedestal.http/port           3000
+                :io.pedestal.http/join?          false
+                :io.pedestal.http/secure-headers {:content-security-policy-settings {:object-src "none"}}}
 
- api-v1 (fern/lit vase/api
-          {:path          "/v1"
-           :expose-api-at "/v1/api.edn"
-           :on-startup    [@datomic-cloud @scores-attrs]
-           :on-request    [@datomic-cloud
-                           @io.pedestal.http/transit-json-body]
-           :routes        @api-v1/routes})
+ api-v1        (fern/lit vase/api
+                         {:path          "/v1"
+                          :expose-api-at "/v1/api.edn"
+                          :on-startup    [@datomic-cloud @scores-attrs]
+                          :on-request    [@datomic-cloud
+                                          @io.pedestal.http/transit-json-body]
+                          :routes        @api-v1/routes})
 
  datomic-cloud (fern/lit vase.datomic.cloud/client @client-config "development")
 
@@ -27,7 +26,7 @@
                 :endpoint      "http://entry.nygard-solo-dev.us-east-2.datomic.net:8182/"
                 :proxy-port    8182}
 
- environment :development
+ environment   :development
 
  api-v1/routes #{["/hello"      :get  (fern/lit vase/respond {:body {:message "Hi there"}})]
                  ["/scores"     :post [@io.pedestal.http.body-params/body-params
@@ -36,7 +35,5 @@
                  ["/scores" :get (fern/lit vase.datomic.cloud/query {:name  :get-scores
                                                                      :query [:find (pull ?e [*]) :where [?e :user/score]]})]}
 
- scores-attrs (fern/lit vase.datomic.cloud/attributes
-                [:user/score :one :long "The user's score"])
-
- }
+ scores-attrs  (fern/lit vase.datomic.cloud/attributes
+                         [:user/score :one :long "The user's score"])}
