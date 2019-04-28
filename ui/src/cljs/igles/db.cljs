@@ -1,6 +1,6 @@
 (ns igles.db)
 
-(def default-view :capture)
+(def default-view :home)
 
 (def initial-value {:counter        0
                     :submit-enabled true

@@ -127,6 +127,9 @@ section {
 .navbar-nav .nav-link em, .navbar-nav .nav-link i{
     font-size: 18px;
 }
+.nav-link:hover {
+    cursor:pointer;
+}
 .navbar.navbar-transparent {
     background-color: transparent;
     box-shadow: none;

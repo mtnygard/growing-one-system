@@ -1,7 +1,8 @@
 (ns igles.views
   (:require [clojure.string :as str]
             [re-frame.core :as rf]
-            [igles.util :refer [<sub]]))
+            [igles.routes :as routes]
+            [igles.util :refer [<sub >dis]]))
 
 (defn +class
   "Add a CSS class to the given element."
@@ -23,12 +24,9 @@
     (fn [& c]
       (modifier (f c) cl))))
 
-
-;
-; Navbar component
-;
-
-
+;;
+;; Navbar component
+;;
 (defn navbar-dropdown-menu [title & items]
   (let [id (str/lower-case title)]
     [:li.nav-item.dropdown
@@ -43,14 +41,17 @@
            hiccup-items (map ->hic items)]
        (apply vector :div.dropdown-menu {:aria-labelledby id} hiccup-items))]))
 
-(defn navbar-toplevel-item [& xs]
+(defn navbar-inpage-item [& xs]
   (let [opts  (if (map? (first xs)) (first xs) {})
         title (if (map? (first xs)) (second xs) (first xs))
         opts  (merge {:href (str "#" (str/lower-case title))} opts)]
     [:li.nav-item [:a.nav-link.page-scroll opts title]]))
 
+(defn navbar-appsection-item [route title]
+  [:li.nav-item [:a.nav-link {:on-click #(>dis :navigate route)} title]])
+
 (defn navbar-clickable-logo [src]
-  [:a.navbar-brand {:href "#"}
+  [:a.navbar-brand {:on-click #(>dis :navigate "/")}
    [:img.nav-brand-logo {:src src}]])
 
 (defn navbar-compressed-icon [collapse-target icon-class]
@@ -74,7 +75,7 @@
 (defn navbar [& items]
   [:nav
    [navbar-compressed-icon "navbarCollapse" "ion-grid"]
-   [navbar-clickable-logo "img/logo-w60.png"]
+   [navbar-clickable-logo "/img/logo-w60.png"]
    [navbar-contents "navbarCollapse" items]])
 
 ;;
@@ -104,6 +105,9 @@
 
 (defn h3 [s]
   [:h3 s])
+
+(defn h4 [s] [:h4 s])
+(defn h5 [s] [:h5.text-uppercase.mb-5 s])
 
 (defn muted [s]
   [:p.lead.text-muted s])
@@ -137,51 +141,54 @@
    [button-secondary {:disabled (not (<sub :can-submit?))
                       :on-click #(rf/dispatch [:submit-score])} "Submit your score"]])
 
-(def ^:private view->panel
-  {:capture [capture-panel]})
+(defn demo
+  []
+  [content-section ["bg-inverse"]
+   [title [h2 "Basic Components"]]
+   [:div {:id "buttons"}
+    [title [h3 "Buttons"]
+     [muted "Multiple Styles"]]
+    [row-full-width
+     [button-primary "Default 2"]
+     [button-outline "Outline"]
+     [button-round "Round"]
+     [button-round [:em.ion-android-checkmark-circle] "with icon"]
+     [button-circle [:em.ion-power]]
+     [button-link "Link"]]
+    [+class [title [muted "Multiple Sizes"]] "mt5"]
 
-(defn active-route []
-  (let [route (<sub :active-route)]
-    (view->panel (:view (:data route)) unavailable)))
+    [row-full-width
+     [+class [button-primary "Extra Small"] "btn-xs"]
+     [+class [button-primary "Small"] "btn-sm"]
+     [button-primary "Regular"]
+     [+class [button-primary "Medium"] "btn-md"]
+     [+class [button-primary "Large"] "btn-lg"]]]])
+
+(defn front-page
+  []
+  [content-section ["hero-header"]
+   [row-full-width
+    [:div.brand
+     (+class (h1 "Know More Tomorrow") "text-white")
+     (h5 "Observe and record facts about the world")]]])
+
+(def ^:private view->panel
+  {:home    [front-page]
+   :demo    [demo]
+   :capture [capture-panel]
+   :worlds  [unavailable]})
+
+(defn view-for [route]
+  (view->panel (:view (:data route)) [front-page]))
 
 (defn main-view
   []
   [:<>
    (+classes
     (navbar
-     [navbar-dropdown-menu "Components"
-      "Buttons"
-      "Forms"
-      "Navigation"
-      ["Progress / Nav Pills" "#progress-pills"]]
-     [navbar-toplevel-item "Icons"]
-     [navbar-toplevel-item "Download"]
-     [navbar-toplevel-item {:target "_blank"
-                            :href   "examples/landing-page.html"} "Example"])
+     [navbar-appsection-item (routes/demo) "Demo"]
+     [navbar-appsection-item (routes/worlds) "Worlds"])
     (navclasses (<sub :scroll-top)))
 
    [:div.wrapper
-
-    [content-section ["hero-header"]
-     [row-full-width [active-route]]]
-
-    [content-section ["bg-inverse"]
-     [title [h2 "Basic Components"]]
-     [:div {:id "buttons"}
-      [title [h3 "Buttons"]
-       [muted "Multiple Styles"]]
-      [row-full-width
-       [button-primary "Default 2"]
-       [button-outline "Outline"]
-       [button-round "Round"]
-       [button-round [:em.ion-android-checkmark-circle] "with icon"]
-       [button-circle [:em.ion-power]]
-       [button-link "Link"]]
-      [+class [title [muted "Multiple Sizes"]] "mt5"]
-
-      [row-full-width
-       [+class [button-primary "Extra Small"] "btn-xs"]
-       [+class [button-primary "Small"] "btn-sm"]
-       [button-primary "Regular"]
-       [+class [button-primary "Medium"] "btn-md"]
-       [+class [button-primary "Large"] "btn-lg"]]]]]])
+    [view-for (<sub :active-route)]]])
