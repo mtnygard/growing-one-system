@@ -3,6 +3,7 @@
             [day8.re-frame.http-fx]
             [ajax.core :as ajax]
             [igles.db :as db]
+            [igles.routes :as routes]
             [day8.re-frame.tracing :refer-macros [fn-traced]]))
 
 (rf/reg-event-fx :initialize-db
@@ -35,3 +36,9 @@
 (rf/reg-event-fx :window-scrolled
                  (fn-traced [{:keys [db]} _]
                             {:db (db/set-scroll-top db (.. js/document -documentElement -scrollTop))}))
+
+(rf/reg-event-fx :create-world
+                 (fn-traced [{:keys [db] :as cofx} [_ _ world-name]]
+                            ;; This is for UI dev. Will make an HTTP call when hooked to the back end
+                            {:db (assoc-in db [db/worlds world-name] {})
+                             :dispatch [:navigate (routes/world (db/user db) world-name)]}))

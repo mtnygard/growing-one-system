@@ -15,10 +15,12 @@
           :view :home}]
    ["/demo" {:name :demo
              :view :demo}]
-   ["/:world/capture" {:name :capture
-                       :view :capture}]
-   ["/:user/worlds" {:name :worlds
-                     :view :worlds}]])
+   ["/new" {:name :create-world
+            :view :create-world}]
+   ["/u/:user" {:name :user
+                :view :user}]
+   ["/u/:user/:world" {:name :world
+                       :view :world}]])
 
 (def router (rfront/router routes))
 
@@ -32,7 +34,9 @@
 
 (def home (partial url-for :home))
 (def demo (partial url-for :demo))
-(defn worlds [] (url-for :worlds {:user "ga"}))
+(def new (partial url-for :create-world))
+(defn worlds [] (url-for :user {:user "ga"} {:tab "worlds"}))
+(defn world [user world] (url-for :world {:user user :world world}))
 
 (def token-transformer
   (let [t (TokenTransformer.)]
@@ -42,7 +46,7 @@
             (str path-prefix token)))
     (set! (.. t -retrieveToken)
           (fn [path-prefix location]
-            (println "token-transformer.retrieveToken: path-prefix = " path-prefix ", location = " location)
+            (println "token-transformer.retrieveToken: path-prefix = '" path-prefix "', location = '" (str (.-pathname location)) "'")
             (str (.-pathname location))))
     t))
 

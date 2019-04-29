@@ -1,8 +1,10 @@
 (ns igles.views
+  (:require-macros [igles.views :refer [handle]])
   (:require [clojure.string :as str]
+            [reagent.core :as r]
             [re-frame.core :as rf]
             [igles.routes :as routes]
-            [igles.util :refer [<sub >dis]]))
+            [igles.util :refer [<sub >evt >dis]]))
 
 (defn +class
   "Add a CSS class to the given element."
@@ -48,6 +50,7 @@
     [:li.nav-item [:a.nav-link.page-scroll opts title]]))
 
 (defn navbar-appsection-item [route title]
+  (println "rendering appsection item " title " with route " route)
   [:li.nav-item [:a.nav-link {:on-click #(>dis :navigate route)} title]])
 
 (defn navbar-clickable-logo [src]
@@ -85,9 +88,17 @@
   [:section.colored-section {:class classes}
    (apply vector :div.container blocks)])
 
+(defn row [& contents]
+  (apply vector :div.row contents))
+
 (defn row-full-width [& contents]
   [:div.row
    (apply vector :div.col-md-8.offset-md-2 contents)])
+
+(defn col [contents]
+  (apply vector :div.col contents))
+
+(def col-sm-3 (variant col ["offset-md-2" "col-sm-3"]))
 
 ;;
 ;; Typography
@@ -111,6 +122,16 @@
 
 (defn muted [s]
   [:p.lead.text-muted s])
+
+;; Inputs
+(defn text-input [model placeholder]
+  [:input {:class "form-control"
+           :type "text"
+           :placeholder placeholder
+           :value @model
+           :on-change (handle
+                       (let [new-val (-> event .-target .-value)]
+                         (reset! model new-val)))}])
 
 ;; Icons
 
@@ -146,7 +167,7 @@
    [content-section ["bg-inverse"]
     [title [h2 "Worlds"]]]
    (+class [row-full-width
-            [button-primary [icon-create] "New World"]] "mt-2")])
+            [button-primary {:on-click #(>dis :navigate (routes/new))} [icon-create] "New World"]] "mt-2")])
 
 ;; Accept observations
 
@@ -184,6 +205,23 @@
      [+class [button-primary "Medium"] "btn-md"]
      [+class [button-primary "Large"] "btn-lg"]]]])
 
+;; Create a new World
+
+(defn create-world-panel 
+  []
+  (let [world-name (r/atom nil)
+        _ (println "created model with value " @world-name)]
+    (fn []
+      [content-section ["bg-inverse"]
+       [row-full-width
+        [title [h2 "Create a new world"]
+         [muted "A world contains a schema and observations within that schema."]]]
+       [row
+        [col-sm-3
+         [:div.form-group
+          [text-input world-name "World name"]]
+         [button-primary {:on-click (>evt :create-world @world-name)} "Create World"]]]])))
+
 ;; Welcome users
 (defn front-page
   []
@@ -198,7 +236,8 @@
   {:home    [front-page]
    :demo    [demo]
    :capture [capture-panel]
-   :worlds  [worlds]})
+   :user  [worlds]
+   :create-world [create-world-panel]})
 
 (defn view-for [route]
   (view->panel (:view (:data route)) [front-page]))
