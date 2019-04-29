@@ -112,6 +112,12 @@
 (defn muted [s]
   [:p.lead.text-muted s])
 
+;; Icons
+
+(defn icon [nm] [:> "ion-icon" {:name nm
+                                :size "small"}])
+(def icon-create (partial icon "add"))
+
 ;;
 ;; Buttons
 ;;
@@ -128,9 +134,22 @@
 ;;
 ;; Build the actual UI
 ;;
+
+;; Placeholder for when we can't do anything, just put empty content.
 (defn unavailable []
-  ;; can't do anything, just put empty content.
-  [:div])
+  [content-section ["bg-inverse"]
+   [title [h2 "This part isn't written yet"]]])
+
+;; Manage worlds
+(defn worlds []
+  [:<>
+   [content-section ["bg-inverse"]
+    [title [h2 "Worlds"]]]
+   (+class [row-full-width
+            [button-primary [icon-create] "New World"]] "mt-2")])
+
+;; Accept observations
+
 
 (defn capture-panel
   []
@@ -141,6 +160,7 @@
    [button-secondary {:disabled (not (<sub :can-submit?))
                       :on-click #(rf/dispatch [:submit-score])} "Submit your score"]])
 
+;; Show off some components (also a testing ground for styles)
 (defn demo
   []
   [content-section ["bg-inverse"]
@@ -164,6 +184,7 @@
      [+class [button-primary "Medium"] "btn-md"]
      [+class [button-primary "Large"] "btn-lg"]]]])
 
+;; Welcome users
 (defn front-page
   []
   [content-section ["hero-header"]
@@ -172,15 +193,17 @@
      (+class (h1 "Know More Tomorrow") "text-white")
      (h5 "Observe and record facts about the world")]]])
 
+;; Map routes to views
 (def ^:private view->panel
   {:home    [front-page]
    :demo    [demo]
    :capture [capture-panel]
-   :worlds  [unavailable]})
+   :worlds  [worlds]})
 
 (defn view-for [route]
   (view->panel (:view (:data route)) [front-page]))
 
+;; Bring it all together
 (defn main-view
   []
   [:<>

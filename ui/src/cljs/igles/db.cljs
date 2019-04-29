@@ -2,7 +2,8 @@
 
 (def default-view :home)
 
-(def initial-value {:counter        0
+(def initial-value {:user           "ga"
+                    :worlds         {}
                     :submit-enabled true
                     :route          {:data {:view default-view}}})
 
@@ -21,3 +22,11 @@
 
 (def scroll-top :scroll-top)
 (defn set-scroll-top [db x] (assoc db scroll-top x))
+
+(def user :user)
+(defn set-user [db x] (assoc db user x))
+
+(def worlds :worlds)
+(defn set-worlds [db x] (assoc db worlds x))
+
+(defn user-worlds [db user] (get-in db [worlds user]))
