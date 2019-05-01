@@ -24,13 +24,15 @@
 
 (def router (rfront/router routes))
 
-(defn- url-for
-  ([nm]
+(defn url-for-router
+  ([router nm]
    (reitit/match->path (rfront/match-by-name router nm)))
-  ([nm path-params]
+  ([router nm path-params]
    (reitit/match->path (rfront/match-by-name router nm path-params)))
-  ([nm path-params query-params]
+  ([router nm path-params query-params]
    (reitit/match->path (rfront/match-by-name router nm path-params) query-params)))
+
+(def ^:private url-for (partial url-for-router router))
 
 (def home (partial url-for :home))
 (def demo (partial url-for :demo))

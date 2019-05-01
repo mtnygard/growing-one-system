@@ -50,7 +50,6 @@
     [:li.nav-item [:a.nav-link.page-scroll opts title]]))
 
 (defn navbar-appsection-item [route title]
-  (println "rendering appsection item " title " with route " route)
   [:li.nav-item [:a.nav-link {:on-click #(>dis :navigate route)} title]])
 
 (defn navbar-clickable-logo [src]
@@ -209,8 +208,7 @@
 
 (defn create-world-panel 
   []
-  (let [world-name (r/atom nil)
-        _ (println "created model with value " @world-name)]
+  (let [world-name (r/atom nil)]
     (fn []
       [content-section ["bg-inverse"]
        [row-full-width
