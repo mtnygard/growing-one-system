@@ -1,8 +1,10 @@
 {:paths   ["src" "resources"]
- :deps    {com.cognitect/pedestal.vase {:local/root "../../vase"}}
+ :deps    {com.cognitect/pedestal.vase {:local/root "../../vase"}
+           com.cognitect/anomalies     {:mvn/version "0.1.12"}
+           instaparse                  {:mvn/version "1.4.10"}}
  :aliases {:dev {:main-opts   ["-m" "frenpl"]
                  :extra-paths ["dev"]
                  :extra-deps  {frenpl {:git/url "https://gist.github.com/mtnygard/9b2dd3c88b3309d82210b84f33ee954d"
-                                       :sha      "d8f0739a045e3a4eb309d126510de5170949465b"}}}
+                                       :sha     "d8f0739a045e3a4eb309d126510de5170949465b"}}}
            :run {:main-opts ["-m" "gos.main" "src/config.fern"]
                  :jvm-opts  ["--add-modules" "java.xml.bind"]}}}

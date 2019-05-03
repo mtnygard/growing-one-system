@@ -1,4 +1,4 @@
-{vase/plugins  [gos.scores]
+{vase/plugins  [gos.world gos.db]
 
  vase/service  (fern/lit vase/service
                          {:apis        [@api-v1]
@@ -12,10 +12,10 @@
  api-v1        (fern/lit vase/api
                          {:path          "/v1"
                           :expose-api-at "/v1/api.edn"
-                          :on-startup    [@datomic-cloud @scores-attrs]
+                          :on-startup    [@datomic-cloud @world-attrs @user-attrs @user-seed @observations]
                           :on-request    [@datomic-cloud
                                           @io.pedestal.http/transit-json-body]
-                          :routes        @api-v1/routes})
+                          :routes        @api.v1/routes})
 
  datomic-cloud (fern/lit vase.datomic.cloud/client @client-config "development")
 
@@ -28,12 +28,22 @@
 
  environment   :development
 
- api-v1/routes #{["/hello"      :get  (fern/lit vase/respond {:body {:message "Hi there"}})]
-                 ["/scores"     :post [@io.pedestal.http.body-params/body-params
-                                       (fern/lit vase.datomic.cloud/transact {:name       :post-scores
-                                                                              :properties [:user/score]})]]
-                 ["/scores" :get (fern/lit vase.datomic.cloud/query {:name  :get-scores
-                                                                     :query [:find (pull ?e [*]) :where [?e :user/score]]})]}
+ api.v1/routes #{["/hello"         :get (fern/lit vase/respond {:body {:message "Hi there"}})]
+                 ["/w/:world/meta" :get (fern/lit vase.datomic.cloud/query {:query  [:find (pull ?e [*])
+                                                                                     :in $ ?world
+                                                                                     :where [?e :world/name ?world]]
+                                                                            :params [:world]})]
+                 ["/w/:world/accept" :post [@io.pedestal.http.body-params/body-params gos.world/accept @tx]]
+                 ["/w"               :get (fern/lit vase.datomic.cloud/query {:query [:find (pull ?e [:world/name :world/ident])
+                                                                                      :in $
+                                                                                      :where [?e :world/ident]]})]}
 
- scores-attrs  (fern/lit vase.datomic.cloud/attributes
-                         [:user/score :one :long "The user's score"])}
+ tx            gos.db/transact-context
+ world-attrs   (fern/lit vase.datomic.cloud/attributes
+                         [:world/ident :one :string :unique "A globally (universally?) unique identifier for a world."]
+                         [:world/name :one :string "A world name. Only unique within a user or organization"])
+ observations  (fern/lit vase.datomic.cloud/attributes
+                         [:datum/reported-by :one :ref "The user who reported this datum"])
+ user-attrs    (fern/lit vase.datomic.cloud/attributes
+                         [:user/name :one :string :identity "The globally unique name of the user"])
+ user-seed     (fern/lit vase.datomic.cloud/tx {:user/name "ga"})}
