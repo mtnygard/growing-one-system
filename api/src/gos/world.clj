@@ -23,10 +23,10 @@
 
 (defn- transform [parse-tree]
   (insta/transform
-    {
-     :attribute
-     }
-    ))
+   {:name        identity
+    :type        keyword
+    :cardinality keyword}
+   parse-tree))
 
 ;; Processing a request
 
