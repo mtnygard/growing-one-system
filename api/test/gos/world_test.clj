@@ -8,8 +8,10 @@
 
 (deftest parse-inputs
   (testing "Empty input is accepted"
-    (is (not (problems? (p ""))))
-    (is (not (problems? (p ";")))))
+    (is (not (problems? (p "")))))
+  
+  (testing "Comments are ignored"
+    (is (not (problems? (p "// this is a comment\n")))))
   
   (testing "parse error handling"
     (is (problems? (p "no such phrase"))))

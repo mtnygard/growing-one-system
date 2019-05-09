@@ -10,22 +10,33 @@
 
 ;; Parsing inputs
 
+(def ^:private whitespace
+  (insta/parser
+   "whitespace = #'\\s+'"))
+
+(def whitespace-or-comments
+  (insta/parser
+   "ws-or-comments = #'\\s+' | comments
+    comments = comment+
+    comment = '//' inside-comment* '\n'
+    inside-comment =  !( '\n' | '//' ) #'.' | comment"
+   :auto-whitespace whitespace))
+
 (def ^:private grammar
   (insta/parser
-    "<input> = ((attribute / relation / instance) <';'>)*
-     attribute = 'attr' name type cardinality
+   "<input> = ((attribute / relation / instance) <';'>)*
+     attribute = <'attr'> name type cardinality
      relation = 'relation' name name+
      instance = name value+
      name = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
      type = #\"[a-zA-Z_][a-zA-Z0-9]*\"
      value = #\"[^\\s;]+\"
      cardinality = 'one' | 'many'"
-    :auto-whitespace :comma
-    )) 
+   :auto-whitespace whitespace-or-comments)) 
 
 (defn- transform [parse-tree]
   (insta/transform
-   {:attribute   (fn [_ n t c] [:attribute n t c])
+   {:attribute   (fn [n t c] [:attribute n t c])
     :name        identity
     :type        keyword
     :cardinality keyword
