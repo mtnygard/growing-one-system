@@ -28,3 +28,7 @@
   (if (test ctx)
     ctx
     (with-problems ctx problem)))
+
+(def problems? 
+  (comp not empty? :problems))
+  

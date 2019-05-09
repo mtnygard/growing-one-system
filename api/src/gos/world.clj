@@ -1,7 +1,7 @@
 (ns gos.world
   (:require [datomic.client.api :as d]
             [gos.responses :as responses :refer [ok bad-request]]
-            [gos.problems :refer [and-then->]]
+            [gos.problems :refer [and-then-> with-problems]]
             [instaparse.core :as insta]
             [io.pedestal.interceptor :as i]
             [clojure.string :as str]))
@@ -12,20 +12,24 @@
 
 (def ^:private grammar
   (insta/parser
-    "<input> = ((attribute | relation) <';'>)*
+    "<input> = ((attribute / relation / instance) <';'>)*
      attribute = 'attr' name type cardinality
-     relation = 'relation' name+
+     relation = 'relation' name name+
+     instance = name value+
      name = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
      type = #\"[a-zA-Z_][a-zA-Z0-9]*\"
+     value = #\"[^\\s;]+\"
      cardinality = 'one' | 'many'"
     :auto-whitespace :comma
-    ))
+    )) 
 
 (defn- transform [parse-tree]
   (insta/transform
-   {:name        identity
+   {:attribute   (fn [_ n t c] [:attribute n t c])
+    :name        identity
     :type        keyword
-    :cardinality keyword}
+    :cardinality keyword
+    :relation    (fn [_ r & xs] [:relation r xs])}
    parse-tree))
 
 ;; Processing a request
@@ -36,7 +40,10 @@
    :world world})
 
 (defn parse [state body]
-  state)
+  (let [result (insta/parse grammar body)]
+    (if (insta/failure? result)
+      (with-problems state (insta/get-failure result))
+      (assoc state :parsed (transform result)))))
 
 (defn effect [state] state)
 
