@@ -1,12 +1,21 @@
 (ns gos.world
-  (:require [datomic.client.api :as d]
-            [gos.responses :as responses :refer [ok bad-request]]
+  (:require [clojure.string :as str]
+            [datomic.client.api :as d]
             [gos.problems :refer [and-then-> with-problems]]
+            [gos.responses :as responses :refer [bad-request ok]]
+            [gos.seq :refer [conjv]]
             [instaparse.core :as insta]
-            [io.pedestal.interceptor :as i]
-            [clojure.string :as str]))
+            [io.pedestal.interceptor :as i]))
 
 ;; Implementation
+
+(defmulti ->tx-data (fn [_ [a & _]] a))
+
+(defmethod ->tx-data :attribute [state [_ nm ty card]]
+  (update state :tx-data conjv
+    {:db/ident       nm
+     :db/valueType   (keyword "db.type" (str ty))
+     :db/cardinality (keyword "db.cardinality" (str card))}))
 
 ;; Parsing inputs
 
@@ -32,7 +41,7 @@
      type = #\"[a-zA-Z_][a-zA-Z0-9]*\"
      value = #\"[^\\s;]+\"
      cardinality = 'one' | 'many'"
-   :auto-whitespace whitespace-or-comments)) 
+   :auto-whitespace whitespace-or-comments))
 
 (defn- transform [parse-tree]
   (insta/transform
@@ -56,15 +65,15 @@
       (with-problems state (insta/get-failure result))
       (assoc state :parsed (transform result)))))
 
-(defn effect [state] state)
+(defn effect [state]
+  (assoc state :tx-data (reduce ->tx-data state (:parsed state))))
 
 (defn response [state]
-  (ok (select-keys state [:problems :outcome])))
+  (assoc state :response (ok (select-keys state [:problems :outcome :db]))))
 
 (defn process
-  [conn db world body]
-  (and-then->
-   (current-state conn db world)
+  [start-state body]
+  (and-then-> start-state
    (parse body)
    (effect)
    (response)))
