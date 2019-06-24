@@ -1,6 +1,7 @@
 (ns gos.datomic-fixtures
   (:require  [clojure.test :as t]
-             [datomic.api :as d])
+             [datomic.api :as d]
+             [gos.db :as db])
   (:import [java.util UUID]))
 
 (defn new-database
@@ -35,4 +36,8 @@
   ([db-ident]
    (lookup-attribute (d/db *current-db-connection*) db-ident))
   ([db db-ident]
-   (d/pull db '[*] [:db/ident db-ident])))
+   (d/entity db db-ident)))
+
+(defn adapter
+  []
+  (db/classic *current-db-uri* *current-db-connection*))

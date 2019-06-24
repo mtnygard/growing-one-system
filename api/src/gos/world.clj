@@ -1,6 +1,6 @@
 (ns gos.world
   (:require [clojure.string :as str]
-            [datomic.client.api :as d]
+            [gos.db :as db]
             [gos.problems :refer [and-then-> with-problems]]
             [gos.responses :as responses :refer [bad-request ok]]
             [gos.seq :refer [conjv]]
@@ -9,13 +9,10 @@
 
 ;; Implementation
 
-(defmulti ->tx-data (fn [_ [a & _]] a))
+(defmulti ->effect (fn [_ [a & _]] a))
 
-(defmethod ->tx-data :attribute [state [_ nm ty card]]
-  (update state :tx-data conjv
-    {:db/ident       nm
-     :db/valueType   (keyword "db.type" (str ty))
-     :db/cardinality (keyword "db.cardinality" (str card))}))
+(defmethod ->effect :attribute [state [_ nm ty card]]
+  (update state :tx-data conjv (db/mkattr nm ty card)))
 
 ;; Parsing inputs
 
@@ -46,7 +43,7 @@
 (defn- transform [parse-tree]
   (insta/transform
    {:attribute   (fn [n t c] [:attribute n t c])
-    :name        identity
+    :name        keyword
     :type        keyword
     :cardinality keyword
     :relation    (fn [_ r & xs] [:relation r xs])}
@@ -54,10 +51,9 @@
 
 ;; Processing a request
 
-(defn current-state [conn db world]
-  {:conn  conn
-   :db    db
-   :world world})
+(defn current-state [dbadapter world]
+  {:dbadapter dbadapter
+   :world     world})
 
 (defn parse [state body]
   (let [result (insta/parse grammar body)]
@@ -65,11 +61,15 @@
       (with-problems state (insta/get-failure result))
       (assoc state :parsed (transform result)))))
 
+;; todo - generalize to more than just DB transactions
+;; todo - consider: can re-frame be used on server side?
 (defn effect [state]
-  (assoc state :tx-data (reduce ->tx-data state (:parsed state))))
+  (let [state   (reduce ->effect state (:parsed state))
+        tx-data (:tx-data state)]
+    (assoc state :tx-result (db/transact (:dbadapter state) tx-data))))
 
 (defn response [state]
-  (assoc state :response (ok (select-keys state [:problems :outcome :db]))))
+  (assoc state :response (ok (select-keys state [:problems :outcome]))))
 
 (defn process
   [start-state body]
@@ -84,7 +84,7 @@
   (i/interceptor
    {:name ::accept
     :enter (fn [{:keys [request] :as ctx}]
-             (let [{:keys [conn db]} request
+             (let [{:keys [conn dbadapter]} request
                    world             (-> request :path-params :world)
                    body              (first (vals (select-keys request [:transit-params :json-params :edn-params])))]
-               (assoc ctx :response (process conn db world body))))}))
+               (assoc ctx :response (process (current-state dbadapter world) body))))}))

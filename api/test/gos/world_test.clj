@@ -3,7 +3,8 @@
             [gos.world :as world]
             [gos.problems :refer [problems?]]
             [datomic.api :as d]
-            [gos.datomic-fixtures :as fix]))
+            [gos.datomic-fixtures :as fix]
+            [gos.db :as db]))
 
 (defn- p [body]
   (world/parse {} body))
@@ -34,22 +35,46 @@
     (is (= :instance (ffirst (:parsed (p "code growing-one-system-book https://github.com/mtnygard/growing-one-system-book;"))))))
   )
 
-(defn- process [body]
-  (let [conn           fix/*current-db-connection*
-        starting-state {:conn  conn
-                        :db    (d/db conn)
-                        :world {}}]
-    (world/process starting-state body)))
+(defn- process
+  [start-state body]
+  (world/process start-state body))
+
+(defn- start-state []
+  (world/current-state (fix/adapter) {}))
 
 (def ^:private attr? fix/lookup-attribute)
 
 (defn attr? [k exp]
   (= exp (select-keys (fix/lookup-attribute k) (keys exp))))
 
+(defmacro after [strs & assertions]
+  `(fix/with-database []
+     (let [~'end-state (reduce process (start-state) ~strs)]
+       ~@assertions)))
+
 (deftest attribute
   (testing "can be added"
-    (fix/with-database []
-      (let [end-state (process "attr name string one;")]
-        (println end-state)
+    (testing "as single-valued"
+      (after ["attr name string one;"]
         (is (not (problems? end-state)))
-        (is (attr? :name {:db/ident :name}))))))
+        (is (attr? :name {:db/ident       :name
+                          :db/valueType   :db.type/string
+                          :db/cardinality :db.cardinality/one}))))
+    (testing "or multi-valued"
+      (after ["attr scores long many;"]
+        (is (not (problems? end-state)))
+        (is (attr? :scores {:db/ident       :scores
+                            :db/valueType   :db.type/long
+                            :db/cardinality :db.cardinality/many})))))
+
+  (testing "can be expanded"
+    (after ["attr name string one;" "attr name string many;"]
+        (is (not (problems? end-state)))
+        (is (attr? :scores {:db/ident       :name
+                            :db/cardinality :db.cardinality/many}))))
+
+
+
+
+
+  )
