@@ -4,7 +4,8 @@
             [gos.problems :refer [problems?]]
             [datomic.api :as d]
             [gos.datomic-fixtures :as fix]
-            [gos.db :as db]))
+            [gos.db :as db]
+            [fern :as f]))
 
 (defn- p [body]
   (world/parse {} body))
@@ -45,7 +46,7 @@
 (def ^:private attr? fix/lookup-attribute)
 
 (defn attr? [k exp]
-  (= exp (select-keys (fix/lookup-attribute k) (keys exp))))
+  (is (= exp (select-keys (fix/lookup-attribute k) (keys exp)))))
 
 (defmacro after [strs & assertions]
   `(fix/with-database []
@@ -57,24 +58,20 @@
     (testing "as single-valued"
       (after ["attr name string one;"]
         (is (not (problems? end-state)))
-        (is (attr? :name {:db/ident       :name
-                          :db/valueType   :db.type/string
-                          :db/cardinality :db.cardinality/one}))))
-    (testing "or multi-valued"
+        (attr? :name {:db/ident       :name
+                      :db/valueType   :db.type/string
+                      :db/cardinality :db.cardinality/one})))
+
+    (testing "can be multi-valued"
       (after ["attr scores long many;"]
         (is (not (problems? end-state)))
-        (is (attr? :scores {:db/ident       :scores
-                            :db/valueType   :db.type/long
-                            :db/cardinality :db.cardinality/many})))))
+        (attr? :scores {:db/ident       :scores
+                        :db/valueType   :db.type/long
+                        :db/cardinality :db.cardinality/many}))))
 
   (testing "can be expanded"
-    (after ["attr name string one;" "attr name string many;"]
+    (after ["attr name string one;"]
+      (after ["attr name string many;"]
         (is (not (problems? end-state)))
-        (is (attr? :scores {:db/ident       :name
-                            :db/cardinality :db.cardinality/many}))))
-
-
-
-
-
-  )
+        (attr? :name {:db/ident       :name
+                      :db/cardinality :db.cardinality/many})))))

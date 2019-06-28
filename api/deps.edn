@@ -4,7 +4,7 @@
            re-frame                    {:mvn/version "0.10.6"}
            instaparse                  {:mvn/version "1.4.10"}}
  :aliases {:dev {:main-opts   ["-m" "frenpl"]
-                 :extra-paths ["dev"]
+                 :extra-paths ["dev" "test"]
                  :extra-deps  {frenpl {:local/root "../../frenpl"}}}
            :run {:main-opts ["-m" "gos.main" "src/config.fern"]
                  :jvm-opts  ["--add-modules" "java.xml.bind"]}}}

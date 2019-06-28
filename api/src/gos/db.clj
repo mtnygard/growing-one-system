@@ -17,7 +17,8 @@
   (transact [context tx-data] "Apply a transaction, return a tx result"))
 
 (defprotocol Q
-  (q [context query & args]))
+  (q [context query args])
+  (e [context eid]))
 
 (defrecord DClient [client conn]
   Tx
@@ -27,8 +28,10 @@
   (db [this]
     (dclient/db conn))
   Q
-  (q [this query & args]
-    (apply dclient/q query args)))
+  (q [this query args]
+    (apply dclient/q query (db this) args))
+  (e [this eid]
+    (dclient/pull (db this) '[*] eid)))
 
 (defn client [config db-name]
   (let [client (dclient/client config)
@@ -44,8 +47,11 @@
   (db [this]
     (dclassic/db conn))
   Q
-  (q [this query & args]
-    (apply dclassic/q query args)))
+  (q [this query args]
+    (println "DClassic.q: " args " (type " (type args) ")")
+    (apply dclassic/q query (db this) args))
+  (e [this eid]
+    (dclassic/entity (db this) eid)))
 
 (defn classic
   ([uri]
@@ -55,13 +61,24 @@
   ([uri conn]
    (->DClassic uri conn)))
 
-;; API
+(defn- attribute-exists? [dbadaptor nm]
+  (some? (e dbadaptor nm)))
 
-(defn mkattr [nm ty card & options]
-  {:pre [(keyword? nm) (keyword? ty) (keyword? card)]}
-  {:db/ident       (keyword nm)
+(defn- attribute-definition [nmkey nm ty card]
+  {nmkey           (keyword nm)
    :db/valueType   (keyword "db.type" (name ty))
    :db/cardinality (keyword "db.cardinality" (name card))})
+
+(def ^:private update-attribute (partial attribute-definition :db/id))
+(def ^:private define-attribute (partial attribute-definition :db/ident))
+
+;; API
+
+(defn mkattr [dbadapter nm ty card & options]
+  {:pre [(keyword? nm) (keyword? ty) (keyword? card)]}
+  (if (attribute-exists? dbadapter nm)
+    (update-attribute nm ty card)
+    (define-attribute nm ty card)))
 
 ;; Pedestal+Vase integration
 

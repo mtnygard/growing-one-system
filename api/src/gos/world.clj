@@ -12,7 +12,7 @@
 (defmulti ->effect (fn [_ [a & _]] a))
 
 (defmethod ->effect :attribute [state [_ nm ty card]]
-  (update state :tx-data conjv (db/mkattr nm ty card)))
+  (update state :tx-data conjv (db/mkattr (:dbadapter state) nm ty card)))
 
 ;; Parsing inputs
 
@@ -66,7 +66,7 @@
 (defn effect [state]
   (let [state   (reduce ->effect state (:parsed state))
         tx-data (:tx-data state)]
-    (assoc state :tx-result (db/transact (:dbadapter state) tx-data))))
+    (assoc state :tx-result @(db/transact (:dbadapter state) tx-data))))
 
 (defn response [state]
   (assoc state :response (ok (select-keys state [:problems :outcome]))))
