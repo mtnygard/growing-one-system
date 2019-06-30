@@ -5,7 +5,59 @@
             [gos.responses :as responses :refer [bad-request ok]]
             [gos.seq :refer [conjv]]
             [instaparse.core :as insta]
-            [io.pedestal.interceptor :as i]))
+            [io.pedestal.interceptor :as i]
+            [clojure.edn :as edn]))
+
+(defn relation [dbadapter nm] (db/e dbadapter nm))
+(def relation-attributes :relation/ordered-attributes)
+
+;; Sanity checks
+
+(defn relation? [e]
+  (contains? e :relation/ordered-attributes))
+
+(defn assert-has-attributes [nm attrs]
+  (assert
+    (not (empty? attrs))
+    (str "Not a relation: " nm)))
+
+(defn assert-sufficient-values [nm attrs vals]
+  (assert (= (count attrs) (count vals))
+    (str
+      "Relation " nm " has " (count attrs)
+      " attributes but " (count vals) " values were supplied.")))
+
+(defn assert-attribute-exists [attrnm actualtype]
+  (assert (some? actualtype)
+    (str "Attribute " attrnm " does not exist.")))
+
+;; Type coercion
+
+(defmulti type-coerce (fn [a _] a))
+
+(defmethod type-coerce :db.type/string
+  [_ s] s)
+
+(defmethod type-coerce :db.type/long
+  [_ s]
+  (edn/read-string s))
+
+(defmethod type-coerce :db.type/symbol
+  [_ s]
+  (symbol s))
+
+(defmethod type-coerce :db.type/boolean
+  [_ s]
+  (some? (edn/read-string s)))
+
+(defmethod type-coerce :db.type/double
+  [_ s]
+  (double (edn/read-string s)))
+
+(defn coerce [dbadapter attr strval]
+  (let [dbtype (db/attr-type dbadapter attr)]
+    (assert-attribute-exists attr dbtype)
+    (type-coerce dbtype strval)))
 
 ;; Implementation
 
@@ -13,6 +65,17 @@
 
 (defmethod ->effect :attribute [state [_ nm ty card]]
   (update state :tx-data conjv (db/mkattr (:dbadapter state) nm ty card)))
+
+(defmethod ->effect :relation [state [_ nm attr-nms]]
+  (update state :tx-data conjv (db/mkrel (:dbadapter state) nm attr-nms)))
+
+(defmethod ->effect :instance [state [_ nm vals]]
+  (let [attrs (relation-attributes (relation (:dbadapter state) nm))]
+    (assert-has-attributes nm attrs)
+    (assert-sufficient-values nm attrs vals)
+    ;; TODO - coercion goes here
+    (let [vals (map #(coerce (:dbadapter state) %1 %2) attrs vals)]
+      (update state :tx-data conjv (db/mkent (:dbadapter state) nm attrs vals)))))
 
 ;; Parsing inputs
 
@@ -42,11 +105,13 @@
 
 (defn- transform [parse-tree]
   (insta/transform
-   {:attribute   (fn [n t c] [:attribute n t c])
-    :name        keyword
-    :type        keyword
-    :cardinality keyword
-    :relation    (fn [_ r & xs] [:relation r xs])}
+    {:attribute   (fn [n t c] [:attribute n t c])
+     :name        keyword
+     :type        keyword
+     :cardinality keyword
+     :value       identity
+     :instance    (fn [r & vs] [:instance r vs])
+     :relation    (fn [_ r & xs] [:relation r xs])}
    parse-tree))
 
 ;; Processing a request
@@ -74,9 +139,9 @@
 (defn process
   [start-state body]
   (and-then-> start-state
-   (parse body)
-   (effect)
-   (response)))
+    (parse body)
+    (effect)
+    (response)))
 
 ;; Interface
 

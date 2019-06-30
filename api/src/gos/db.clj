@@ -3,12 +3,20 @@
             [datomic.api :as dclassic]
             [io.pedestal.interceptor :as i]
             [datomic.client.api :as client]
-            [fern :as f]))
+            [fern :as f]
+            [gos.db :as db]
+            [clojure.edn :as edn]))
+
+;; Kernel attributes
+
+(def relation-attributes
+  [{:db/ident       :relation/ordered-attributes
+    :db/valueType   :db.type/tuple
+    :db/tupleType   :db.type/keyword
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Defines the order of attributes on a relation"}])
 
 ;; Paper over API differences between cloud and on-prem
-
-(defprotocol Init
-  (init [config] "Returns a context"))
 
 (defprotocol Db
   (db [this] "Return a DB value"))
@@ -36,7 +44,8 @@
 (defn client [config db-name]
   (let [client (dclient/client config)
         _      (client/create-database client {:db-name db-name})
-        conn   (client/connect client {:db-name db-name})]
+        conn   (client/connect client {:db-name db-name})
+        _      @(client/transact conn {:tx-data relation-attributes})]
     (->DClient client conn)))
 
 (defrecord DClassic [uri conn]
@@ -48,15 +57,15 @@
     (dclassic/db conn))
   Q
   (q [this query args]
-    (println "DClassic.q: " args " (type " (type args) ")")
     (apply dclassic/q query (db this) args))
   (e [this eid]
     (dclassic/entity (db this) eid)))
 
 (defn classic
   ([uri]
-    (let [_    (dclassic/create-database uri)
-          conn (dclassic/connect uri)]
+   (let [_    (dclassic/create-database uri)
+         conn (dclassic/connect uri)
+         _    @(dclassic/transact conn relation-attributes)]
       (classic uri conn)))
   ([uri conn]
    (->DClassic uri conn)))
@@ -79,6 +88,20 @@
   (if (attribute-exists? dbadapter nm)
     (update-attribute nm ty card)
     (define-attribute nm ty card)))
+
+(defn mkrel [dbadapter nm attr-nms]
+  {:pre [(keyword? nm) (every? keyword? attr-nms)]}
+  {:db/ident                    nm
+   :db.entity/attrs             (vec attr-nms)
+   :relation/ordered-attributes (vec attr-nms)})
+
+(defn mkent [dbadapter nm attrs vals]
+  {:pre [(keyword? nm)]}
+  (zipmap attrs vals))
+
+(defn attr-type [dbadapter attr-nm]
+  {:pre [(keyword? attr-nm)]}
+  (:db/valueType (e dbadapter attr-nm)))
 
 ;; Pedestal+Vase integration
 

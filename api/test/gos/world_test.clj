@@ -33,12 +33,11 @@
 
   (testing "Making an element of a relation"
     (is (not (problems? (p "code growing-one-system https://github.com/mtnygard/growing-one-system;"))))
-    (is (= :instance (ffirst (:parsed (p "code growing-one-system-book https://github.com/mtnygard/growing-one-system-book;"))))))
-  )
+    (is (= :instance (ffirst (:parsed (p "code growing-one-system-book https://github.com/mtnygard/growing-one-system-book;")))))))
 
 (defn- process
   [start-state body]
-  (world/process start-state body))
+  (world/process (dissoc start-state :tx-data) body))
 
 (defn- start-state []
   (world/current-state (fix/adapter) {}))
@@ -47,6 +46,42 @@
 
 (defn attr? [k exp]
   (is (= exp (select-keys (fix/lookup-attribute k) (keys exp)))))
+
+(defn relation? [k]
+  (let [e (db/e (fix/adapter) k)]
+    (is (some? e))
+    (is (contains? e :relation/ordered-attributes))))
+
+(defn- k->lv [kw]
+  (gensym (str "?" (name kw))))
+
+(defn- mask [pred rvals maskvals]
+  (map #(if-not (pred %1 %2) %1) rvals maskvals))
+
+(defn- lparms [lv pat]
+  (mask #(= '_ %2) lv pat))
+
+(defn- lparmvals [pat]
+  (remove #(= '_ %) pat))
+
+(defn- lclause [esym attrs lv]
+  (mapv vector (repeat esym) attrs lv))
+
+(defn- build-query [{:keys [relation/ordered-attributes] :as reln} pattern]
+  (let [lv    (map k->lv ordered-attributes)
+        where (lclause (gensym "?e") ordered-attributes lv)]
+    {:find  (into [] (keep identity lv))
+     :in    (into ['$] (keep identity (lparms lv pattern)))
+     :where where}))
+
+(defn query-args [pattern]
+  (lparmvals pattern))
+
+(defn query-relation [rel & pattern]
+  (let [rel (fix/lookup-relation rel)]
+    (db/q (fix/adapter)
+      (build-query rel pattern)
+      (query-args pattern))))
 
 (defmacro after [strs & assertions]
   `(fix/with-database []
@@ -70,8 +105,29 @@
                         :db/cardinality :db.cardinality/many}))))
 
   (testing "can be expanded"
-    (after ["attr name string one;"]
-      (after ["attr name string many;"]
-        (is (not (problems? end-state)))
-        (attr? :name {:db/ident       :name
-                      :db/cardinality :db.cardinality/many})))))
+    (after ["attr name string one;"
+            "attr name string many;"]
+      (is (not (problems? end-state)))
+      (attr? :name {:db/ident       :name
+                    :db/cardinality :db.cardinality/many}))))
+
+(deftest relation
+  (testing "can be added"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"]
+      (is (not (problems? end-state)))
+      (relation? :person-age)))
+
+  (testing "can have values added"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age douglas 46;"
+            "person-age sarai   39;"
+            "person-age rajesh  25;"]
+      (is (= #{["rajesh" 25]}
+            (query-relation :person-age "rajesh" '_)))
+      )
+    )
+  )
