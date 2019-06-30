@@ -14,7 +14,11 @@
     :db/valueType   :db.type/tuple
     :db/tupleType   :db.type/keyword
     :db/cardinality :db.cardinality/one
-    :db/doc         "Defines the order of attributes on a relation"}])
+    :db/doc         "Defines the order of attributes on a relation"}
+   {:db/ident       :entity/relation
+    :db/valueType   :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Backreference from an entity to the relation it is part of."}])
 
 ;; Paper over API differences between cloud and on-prem
 
@@ -97,7 +101,8 @@
 
 (defn mkent [dbadapter nm attrs vals]
   {:pre [(keyword? nm)]}
-  (zipmap attrs vals))
+  (assoc (zipmap attrs vals)
+    :entity/relation nm))
 
 (defn attr-type [dbadapter attr-nm]
   {:pre [(keyword? attr-nm)]}

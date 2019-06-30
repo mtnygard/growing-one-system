@@ -52,36 +52,8 @@
     (is (some? e))
     (is (contains? e :relation/ordered-attributes))))
 
-(defn- k->lv [kw]
-  (gensym (str "?" (name kw))))
-
-(defn- mask [pred rvals maskvals]
-  (map #(if-not (pred %1 %2) %1) rvals maskvals))
-
-(defn- lparms [lv pat]
-  (mask #(= '_ %2) lv pat))
-
-(defn- lparmvals [pat]
-  (remove #(= '_ %) pat))
-
-(defn- lclause [esym attrs lv]
-  (mapv vector (repeat esym) attrs lv))
-
-(defn- build-query [{:keys [relation/ordered-attributes] :as reln} pattern]
-  (let [lv    (map k->lv ordered-attributes)
-        where (lclause (gensym "?e") ordered-attributes lv)]
-    {:find  (into [] (keep identity lv))
-     :in    (into ['$] (keep identity (lparms lv pattern)))
-     :where where}))
-
-(defn query-args [pattern]
-  (lparmvals pattern))
-
-(defn query-relation [rel & pattern]
-  (let [rel (fix/lookup-relation rel)]
-    (db/q (fix/adapter)
-      (build-query rel pattern)
-      (query-args pattern))))
+(defn qr [nm & pat]
+  (apply world/query-relation (fix/adapter) nm pat))
 
 (defmacro after [strs & assertions]
   `(fix/with-database []
@@ -119,15 +91,63 @@
       (is (not (problems? end-state)))
       (relation? :person-age)))
 
-  (testing "can have values added"
+  (testing "can have a value added"
     (after ["attr name string one;"
             "attr age long one;"
             "relation person-age name age;"
-            "person-age douglas 46;"
-            "person-age sarai   39;"
             "person-age rajesh  25;"]
       (is (= #{["rajesh" 25]}
-            (query-relation :person-age "rajesh" '_)))
-      )
-    )
+            (qr :person-age "rajesh" '_)))))
+
+  (testing "can have several values added"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age douglas 25;"
+            "person-age sarai   39;"
+            "person-age rajesh  25;"]
+      (is (= #{["rajesh" 25] ["douglas" 25]}
+            (qr :person-age '_ 25)))))
+
+  (testing "each value is unique"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age rajesh  25;"
+            "person-age rajesh  25;"
+            "person-age rajesh  25;"]
+      (is (= 1
+            (count (qr :person-age "rajesh" 25))))))
+
+  (testing "different relations with the same attributes"
+    (testing "are allowed"
+      (after ["attr name string one;"
+              "attr years long one;"
+              "relation person-age name years;"
+              "relation employment-duration name years;"]
+        (is (not (problems? end-state)))
+        (relation? :person-age)
+        (relation? :employment-duration)))
+
+    (testing "and their values are distinct"
+      (after ["attr name string one;"
+              "attr years long one;"
+              "relation person-age name years;"
+              "relation employment-duration name years;"
+              "person-age rajesh 25;"
+              "employment-duration rajesh 3;"]
+        (is (not (problems? end-state)))
+        (is (= #{["rajesh" 25]}
+              (qr :person-age "rajesh" '_)))
+        (is (= #{["rajesh" 3]}
+              (qr :employment-duration "rajesh" '_))))))
+
+  (testing "a helper function will query a specific relation"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age rajesh  25;"]
+      (let [qfn (query-helper-fn :person-age)]
+        (is (= 1 (count (qfn (fix/adapter) "rajesh" '_)))))))
+
   )

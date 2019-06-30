@@ -11,6 +11,44 @@
 (defn relation [dbadapter nm] (db/e dbadapter nm))
 (def relation-attributes :relation/ordered-attributes)
 
+;; Querying
+
+(defn- k->lv [kw]
+  (gensym (str "?" (name kw))))
+
+(defn- mask [pred rvals maskvals]
+  (map #(if-not (pred %1 %2) %1) rvals maskvals))
+
+(defn- lparms [lv pat]
+  (mask #(= '_ %2) lv pat))
+
+(defn- lparmvals [pat]
+  (remove #(= '_ %) pat))
+
+(defn- lclause [esym attrs lv]
+  (mapv vector (repeat esym) attrs lv))
+
+(defn- build-query [{:keys [db/ident relation/ordered-attributes] :as reln} pattern]
+  (let [lv    (map k->lv ordered-attributes)
+        esym  (gensym "?e")
+        where (lclause esym ordered-attributes lv)]
+    {:find  (into [] (keep identity lv))
+     :in    (into ['$] (keep identity (lparms lv pattern)))
+     :where (into [[esym :entity/relation ident]] where)}))
+
+(defn query-args [pattern]
+  (lparmvals pattern))
+
+(defn query-relation [dbadapter rel & pattern]
+  (let [rel (relation dbadapter rel)]
+    (db/q dbadapter
+      (build-query rel pattern)
+      (query-args pattern))))
+
+(defn query-helper-fn [rel]
+  (fn [dbadapter & pattern]
+    (apply query-relation dbadapter rel pattern)))
+
 ;; Sanity checks
 
 (defn relation? [e]
