@@ -8,4 +8,5 @@
                  :extra-paths ["dev" "test"]
                  :extra-deps  {frenpl {:local/root "../../frenpl"}}}
            :run {:main-opts ["-m" "gos.main" "src/config.fern"]
-                 :jvm-opts  ["--add-modules" "java.xml.bind"]}}}
+                 :jvm-opts  ["--add-modules" "java.xml.bind"]}
+           :repl {:main-opts ["-m" "gos.repl"]}}}
