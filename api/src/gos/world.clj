@@ -82,6 +82,12 @@
       "Relation " nm " has " (count attrs)
       " attributes but " (count vals) " values were supplied.")))
 
+(defn assert-sufficient-pattern [nm attrs pattern]
+  (assert (= (count attrs) (count pattern))
+    (str
+      "Relation " nm " has " (count attrs)
+      " attributes but the query pattern has " (count pattern) " markers.")))
+
 (defn assert-attribute-exists [attrnm actualtype]
   (assert (some? actualtype)
     (str "Attribute " attrnm " does not exist.")))
@@ -133,16 +139,23 @@
 (defmethod ->effect :relation [state [_ nm attr-nms]]
   (update state :tx-data conjv (db/mkrel (:dbadapter state) nm attr-nms)))
 
-(defmethod ->effect :instance [state [_ nm vals]]
-  (let [attrs (relation-attributes (relation (:dbadapter state) nm))]
+(defmethod ->effect :instance [{:keys [dbadapter] :as state} [_ nm vals]]
+  (let [attrs (relation-attributes (relation dbadapter nm))]
     (assert-has-attributes nm attrs)
     (assert-sufficient-values nm attrs vals)
     ;; TODO - coercion goes here
-    (let [vals (map #(coerce (:dbadapter state) %1 %2) attrs vals)]
-      (update state :tx-data conjv (db/mkent (:dbadapter state) nm attrs vals)))))
+    (let [vals (map #(coerce dbadapter %1 %2) attrs vals)]
+      (update state :tx-data conjv (db/mkent dbadapter nm attrs vals)))))
 
-(defmethod ->effect :query [state [_ & clauses]]
-  (assoc state :query clauses))
+(defn- proper-query [{:keys [dbadapter] :as state} [nm pattern]]
+  (let [attrs (relation-attributes (relation dbadapter nm))]
+    (assert-has-attributes nm attrs)
+    (assert-sufficient-pattern nm attrs pattern)
+    (let [pattern (map #(if (lvar? %2) %2 (coerce dbadapter %1 %2)) attrs pattern)]
+      [nm pattern])))
+
+(defmethod ->effect :query [state [_ & clause]]
+  (assoc state :query (proper-query state clause)))
 
 ;; Parsing inputs
 
@@ -199,14 +212,10 @@
 (defn determine-effects [state]
   (reduce ->effect state (:parsed state)))
 
-(defn answer-queries [{:keys [query] :as state}]
-  (when query
-    (println '+++++)
-    (println (apply query-relation (:dbadapter state) query))
-    (println '+++++))
+(defn answer-queries [{:keys [dbadapter query] :as state}]
   (cond-> state
     (some? query)
-    (assoc :query-result (apply query-relation (:dbadapter state) query))))
+    (assoc :query-result (apply query-relation dbadapter query))))
 
 ;; todo - consider: can re-frame be used on server side?
 (defn apply-transactions [{:keys [tx-data] :as state}]

@@ -161,14 +161,6 @@
                 "attr age long one;"
                 "relation person-age name age;"
                 "person-age rajesh 25;"]
-          (println '-=====)
-          (println (db/q (fix/adapter) '{:find [?name ?age66659], :in [$ ?age66659], :where [[?e66660 :entity/relation :person-age] [?e66660 :name ?name] [?e66660 :age ?age66659]]} [25]))
-          (println '-=====)
           (let [result (world/process (world/current-state (fix/adapter) {}) "person-age ?name 25;")]
             (is (ok? result))
-            (is (= #{["rajesh" 25]} (-> result :response :body :query-result)))
-            )
-          )
-    ))
-
-(run-tests)
+            (is (= #{["rajesh" 25]} (-> result :response :body :query-result)))))))
