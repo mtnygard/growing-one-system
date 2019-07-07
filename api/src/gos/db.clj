@@ -61,7 +61,9 @@
     (dclassic/db conn))
   Q
   (q [this query args]
-    (apply dclassic/q query (db this) args))
+    (let [result (apply dclassic/q query (db this) (list* args))]
+      (println 'query query (db this) (list* args) '=> result)
+      result))
   (e [this eid]
     (dclassic/entity (db this) eid)))
 

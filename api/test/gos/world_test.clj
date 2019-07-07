@@ -53,7 +53,7 @@
     (is (contains? e :relation/ordered-attributes))))
 
 (defn qr [nm & pat]
-  (apply world/query-relation (fix/adapter) nm pat))
+  (world/query-relation (fix/adapter) nm pat))
 
 (defmacro after [strs & assertions]
   `(fix/with-database []
@@ -97,7 +97,7 @@
             "relation person-age name age;"
             "person-age rajesh  25;"]
       (is (= #{["rajesh" 25]}
-            (qr :person-age "rajesh" '_)))))
+            (qr :person-age "rajesh" '?age)))))
 
   (testing "can have several values added"
     (after ["attr name string one;"
@@ -107,7 +107,7 @@
             "person-age sarai   39;"
             "person-age rajesh  25;"]
       (is (= #{["rajesh" 25] ["douglas" 25]}
-            (qr :person-age '_ 25)))))
+            (qr :person-age '?name 25)))))
 
   (testing "each value is unique"
     (after ["attr name string one;"
@@ -138,16 +138,37 @@
               "employment-duration rajesh 3;"]
         (is (not (problems? end-state)))
         (is (= #{["rajesh" 25]}
-              (qr :person-age "rajesh" '_)))
+              (qr :person-age "rajesh" '?age)))
         (is (= #{["rajesh" 3]}
-              (qr :employment-duration "rajesh" '_))))))
+              (qr :employment-duration "rajesh" '?age))))))
 
   (testing "a helper function will query a specific relation"
     (after ["attr name string one;"
             "attr age long one;"
             "relation person-age name age;"
             "person-age rajesh  25;"]
-      (let [qfn (query-helper-fn :person-age)]
-        (is (= 1 (count (qfn (fix/adapter) "rajesh" '_)))))))
+      (let [qfn (world/query-helper-fn :person-age)]
+        (is (= 1 (count (qfn (fix/adapter) ["rajesh" '?age])))))))
 
   )
+
+(defn- ok? [{:keys [response]}]
+  (= 200 (:status response)))
+
+(deftest queries
+  (testing "a query looks like an instance with a logic variable"
+        (after ["attr name string one;"
+                "attr age long one;"
+                "relation person-age name age;"
+                "person-age rajesh 25;"]
+          (println '-=====)
+          (println (db/q (fix/adapter) '{:find [?name ?age66659], :in [$ ?age66659], :where [[?e66660 :entity/relation :person-age] [?e66660 :name ?name] [?e66660 :age ?age66659]]} [25]))
+          (println '-=====)
+          (let [result (world/process (world/current-state (fix/adapter) {}) "person-age ?name 25;")]
+            (is (ok? result))
+            (is (= #{["rajesh" 25]} (-> result :response :body :query-result)))
+            )
+          )
+    ))
+
+(run-tests)
