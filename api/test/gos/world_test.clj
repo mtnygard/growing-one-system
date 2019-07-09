@@ -20,6 +20,9 @@
   (testing "parse error handling"
     (is (problems? (p "no such phrase"))))
 
+  (testing "string literal"
+    (is (not (problems? (p "x \"this is a string\";")))))
+
   (testing "Defining an attribute"
     (is (not (problems? (p "attr name string one;"))))
     (is (= :attribute (ffirst (:parsed (p "attr aliases string many;"))))))
@@ -32,8 +35,12 @@
     (is (not (problems? (p "attr name string one; attr repo url many; relation code-location name repo;")))))
 
   (testing "Making an element of a relation"
-    (is (not (problems? (p "code growing-one-system https://github.com/mtnygard/growing-one-system;"))))
-    (is (= :instance (ffirst (:parsed (p "code growing-one-system-book https://github.com/mtnygard/growing-one-system-book;")))))))
+    (is (not (problems? (p "code \"growing-one-system\" \"https://github.com/mtnygard/growing-one-system\";"))))
+    (is (= :instances (ffirst (:parsed (p "code \"growing-one-system-book\" \"https://github.com/mtnygard/growing-one-system-book\";"))))))
+
+  (testing "Queries have logic variables"
+    (is (not (problems? (p "person ?n;"))))
+    (is (= :query (ffirst (:parsed (p "person ?n;")))))))
 
 (defn- process
   [start-state body]
@@ -53,7 +60,7 @@
     (is (contains? e :relation/ordered-attributes))))
 
 (defn qr [nm & pat]
-  (world/query-relation (fix/adapter) nm pat))
+  ((world/query-helper-fn (fix/adapter) nm) pat))
 
 (defmacro after [strs & assertions]
   `(fix/with-database []
@@ -95,7 +102,7 @@
     (after ["attr name string one;"
             "attr age long one;"
             "relation person-age name age;"
-            "person-age rajesh  25;"]
+            "person-age \"rajesh\" 25;"]
       (is (= #{["rajesh" 25]}
             (qr :person-age "rajesh" '?age)))))
 
@@ -103,9 +110,19 @@
     (after ["attr name string one;"
             "attr age long one;"
             "relation person-age name age;"
-            "person-age douglas 25;"
-            "person-age sarai   39;"
-            "person-age rajesh  25;"]
+            "person-age \"douglas\" 25;"
+            "person-age \"sarai\"   39;"
+            "person-age \"rajesh\"  25;"]
+      (is (= #{["rajesh" 25] ["douglas" 25]}
+            (qr :person-age '?name 25)))))
+
+  (testing "can have several values added at once"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age \"douglas\" 25,
+             person-age \"sarai\"   39,
+             person-age \"rajesh\"  25;"]
       (is (= #{["rajesh" 25] ["douglas" 25]}
             (qr :person-age '?name 25)))))
 
@@ -113,9 +130,9 @@
     (after ["attr name string one;"
             "attr age long one;"
             "relation person-age name age;"
-            "person-age rajesh  25;"
-            "person-age rajesh  25;"
-            "person-age rajesh  25;"]
+            "person-age \"rajesh\"  25;"
+            "person-age \"rajesh\"  25;"
+            "person-age \"rajesh\"  25;"]
       (is (= 1
             (count (qr :person-age "rajesh" 25))))))
 
@@ -134,8 +151,8 @@
               "attr years long one;"
               "relation person-age name years;"
               "relation employment-duration name years;"
-              "person-age rajesh 25;"
-              "employment-duration rajesh 3;"]
+              "person-age \"rajesh\" 25;"
+              "employment-duration \"rajesh\" 3;"]
         (is (not (problems? end-state)))
         (is (= #{["rajesh" 25]}
               (qr :person-age "rajesh" '?age)))
@@ -146,21 +163,35 @@
     (after ["attr name string one;"
             "attr age long one;"
             "relation person-age name age;"
-            "person-age rajesh  25;"]
-      (let [qfn (world/query-helper-fn :person-age)]
-        (is (= 1 (count (qfn (fix/adapter) ["rajesh" '?age])))))))
-
-  )
+            "person-age \"rajesh\" 25;"]
+      (let [qfn (world/query-helper-fn (fix/adapter) :person-age)]
+        (is (= 1 (count (qfn ["rajesh" '?age]))))))))
 
 (defn- ok? [{:keys [response]}]
   (= 200 (:status response)))
 
 (deftest queries
   (testing "a query looks like an instance with a logic variable"
-        (after ["attr name string one;"
-                "attr age long one;"
-                "relation person-age name age;"
-                "person-age rajesh 25;"]
-          (let [result (world/process (world/current-state (fix/adapter) {}) "person-age ?name 25;")]
-            (is (ok? result))
-            (is (= #{["rajesh" 25]} (-> result :response :body :query-result)))))))
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age \"rajesh\" 25;"]
+      (let [result (world/process (world/current-state (fix/adapter) {}) "person-age ?name 25;")]
+        (is (ok? result))
+        (is (= #{["rajesh" 25]} (-> result :response :body :query-result))))))
+
+  (testing "a query can have multiple clauses"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age \"rajesh\" 25;"
+            "attr location string one;"
+            "relation assignment name location;"
+            "assignment \"rajesh\" \"southlake\";"]
+              (def db* (db/db (fix/adapter)))
+      (let [result (world/process
+                     (world/current-state (fix/adapter) {})
+                     "person-age ?name 25, assignment ?name \"southlake\";")]
+        (def db* (db/db (fix/adapter)))
+        (is (ok? result))
+        (is (= #{["rajesh" 25 "southlake"]} (-> result :response :body :query-result)))))))

@@ -4,4 +4,4 @@
   (conj (or coll []) x))
 
 (defn sequential-tree [x]
-  (tree-seq seq? identity x))
+  (tree-seq sequential? identity x))
