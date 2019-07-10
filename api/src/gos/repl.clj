@@ -3,7 +3,8 @@
   (:require [clojure.pprint :as pp]
             [clojure.string :as str]
             [gos.db :as db]
-            [gos.world :as world]))
+            [gos.world :as world])
+  (:gen-class))
 
 (defn- prompt
   []

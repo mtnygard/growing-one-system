@@ -1,15 +1,18 @@
-{:paths   ["src" "resources"]
- :deps    {com.datomic/client-cloud    {:mvn/version "0.8.78"}
-           com.datomic/datomic-pro     {:mvn/version "0.9.5930"}
-           com.cognitect/pedestal.vase {:local/root "../../vase"}
-           com.cognitect/anomalies     {:mvn/version "0.1.12"}
-           re-frame                    {:mvn/version "0.10.6"}
-           instaparse                  {:mvn/version "1.4.10"}}
- :aliases {:dev     {:main-opts   ["-m" "frenpl"]
-                     :extra-paths ["dev" "test"]
-                     :extra-deps  {frenpl {:local/root "../../frenpl"}}}
-           :run     {:main-opts ["-m" "gos.main" "src/config.fern"]
-                     :jvm-opts  ["--add-modules" "java.xml.bind"]}
-           :repl    {:main-opts ["-m" "gos.repl"]}
-           :uberjar {:extra-deps {uberdeps {:mvn/version "0.1.4"}}
-                     :main-opts  ["-m" "uberdeps.uberjar"]}}}
+{:paths     ["src" "resources"]
+ :deps      {com.datomic/client-cloud    {:mvn/version "0.8.78"}
+             com.datomic/datomic-pro     {:mvn/version "0.9.5930"}
+             com.cognitect/pedestal.vase {:local/root "../../vase"}
+             com.cognitect/anomalies     {:mvn/version "0.1.12"}
+             re-frame                    {:mvn/version "0.10.6"}
+             instaparse                  {:mvn/version "1.4.10"}}
+ :aliases   {:dev     {:main-opts   ["-m" "frenpl"]
+                       :extra-paths ["dev" "test"]
+                       :extra-deps  {frenpl {:local/root "../../frenpl"}}}
+             :run     {:main-opts ["-m" "gos.main" "src/config.fern"]
+                       :jvm-opts  ["--add-modules" "java.xml.bind"]}
+             :repl    {:main-opts ["-m" "gos.repl"]}
+             :uberjar {:extra-deps {mdiin/cambada {:git/url "https://github.com/mdiin/cambada"
+                                                   :sha     "18958e1f12798593efd70e4c67825167416d9cef"}}
+                       :main-opts  ["-m" "cambada.uberjar" "-m" "gos.repl"]}}
+ :mvn/repos {"central" {:url "http://central.maven.org/maven2/"}
+             "clojars" {:url "https://repo.clojars.org/"}}}

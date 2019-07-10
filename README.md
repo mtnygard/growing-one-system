@@ -46,4 +46,25 @@ A variety of housekeeping tasks will be performed by "software delivery machines
 
 You won't be able to run these machines directly. They're part of the infrastructure for running the main project and site.
 
-# Try this out
+# Try It Out
+
+The API module offers a CLI to let you have a conversation with your
+model of the world. You can run the CLI in dev mode like this:
+
+    cd api
+    clj -A:repl
+
+Enter statements exactly as you would through the UI.
+
+To package the CLI for standalone use:
+
+    cd api
+    clj -A:uberjar
+
+The resulting uberjar will be in `target/api-1.0.0-SNAPSHOT-standalone.jar`.
+
+To run the uberjar:
+
+    java -jar target/api-1.0.0-SNAPSHOT-standalone.jar
+
+That's a mouthful, so you'll probably want to make an alias for it.
