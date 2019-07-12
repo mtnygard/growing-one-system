@@ -55,7 +55,7 @@
   (is (= exp (select-keys (fix/lookup-attribute k) (keys exp)))))
 
 (defn relation? [k]
-  (let [e (db/e (fix/adapter) k)]
+  (let [e (db/rel (fix/adapter) k)]
     (is (some? e))
     (is (contains? e :relation/ordered-attributes))))
 
@@ -97,6 +97,12 @@
             "relation person-age name age;"]
       (is (not (problems? end-state)))
       (relation? :person-age)))
+
+  (testing "can be one attribute wide"
+    (after ["attr name string one;"
+            "relation system name;"]
+      (is (not (problems? end-state)))
+      (relation? :system)))
 
   (testing "can have a value added"
     (after ["attr name string one;"
@@ -180,6 +186,16 @@
         (is (ok? result))
         (is (= #{["rajesh" 25]} (-> result :response :body :query-result))))))
 
+  (testing "querying a single-value relation returns the set of values"
+    (after ["attr name string one;"
+            "relation person name;"
+            "person \"douglas\";"
+            "person \"sarai\";"
+            "person \"rajesh\";"]
+      (let [result (world/process (world/current-state (fix/adapter) {}) "person ?n;")]
+        (is (ok? result))
+        (is (= #{["rajesh"] ["sarai"] ["douglas"]} (-> result :response :body :query-result))))))
+
   (testing "a query can have multiple clauses"
     (after ["attr name string one;"
             "attr age long one;"
@@ -188,10 +204,20 @@
             "attr location string one;"
             "relation assignment name location;"
             "assignment \"rajesh\" \"southlake\";"]
-              (def db* (db/db (fix/adapter)))
       (let [result (world/process
                      (world/current-state (fix/adapter) {})
                      "person-age ?name 25, assignment ?name \"southlake\";")]
-        (def db* (db/db (fix/adapter)))
         (is (ok? result))
-        (is (= #{["rajesh" 25 "southlake"]} (-> result :response :body :query-result)))))))
+        (is (= #{["rajesh" 25 "southlake"]} (-> result :response :body :query-result))))))
+
+  (testing "self-joins are allowed"
+    (after ["attr a string one;"
+            "attr b string one; "
+            "relation foo a b;"
+            "foo \"cake\" \"pie\";"
+            "foo \"cake\" \"cake\";"]
+      (let [result (world/process
+                     (world/current-state (fix/adapter) {})
+                     "foo ?a ?a;")]
+        (is (ok? result))
+        (is (= #{["cake"]} (-> result :response :body :query-result)))))))

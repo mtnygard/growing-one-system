@@ -4,7 +4,8 @@
              com.cognitect/pedestal.vase {:local/root "../../vase"}
              com.cognitect/anomalies     {:mvn/version "0.1.12"}
              re-frame                    {:mvn/version "0.10.6"}
-             instaparse                  {:mvn/version "1.4.10"}}
+             instaparse                  {:mvn/version "1.4.10"}
+             org.clojure/tools.cli       {:mvn/version "0.4.2"}}
  :aliases   {:dev     {:main-opts   ["-m" "frenpl"]
                        :extra-paths ["dev" "test"]
                        :extra-deps  {frenpl {:local/root "../../frenpl"}}}

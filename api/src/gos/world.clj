@@ -8,8 +8,8 @@
             [io.pedestal.interceptor :as i]
             [clojure.edn :as edn]))
 
-(defn relation [dbadapter nm] (db/e dbadapter nm))
-(def relation-attributes :relation/ordered-attributes)
+(defn relation [dbadapter nm] (db/rel dbadapter nm))
+(def  relation-attributes :relation/ordered-attributes)
 (defn relation? [e]      (contains? e relation-attributes))
 
 ;; Querying
@@ -64,7 +64,7 @@
         lv    (lparms attrs pattern)
         esym  (gensym "?e")
         where (lclause esym attrs lv)]
-    {:find  (into [] lv)
+    {:find  (into [] (distinct lv))
      :in    (in-clause lv pattern)
      :where (into [[esym :entity/relation ident]] where)
      :args  (remove lvar? pattern)}))

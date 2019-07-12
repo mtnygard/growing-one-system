@@ -15,6 +15,10 @@
     :db/tupleType   :db.type/keyword
     :db/cardinality :db.cardinality/one
     :db/doc         "Defines the order of attributes on a relation"}
+   {:db/ident       :relation/single-attribute
+    :db/valueType   :db.type/keyword
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Used when a relation is a set, because Datomic tuples must be at least 2 elements long"}
    {:db/ident       :entity/relation
     :db/valueType   :db.type/ref
     :db/cardinality :db.cardinality/one
@@ -85,6 +89,11 @@
 (def ^:private update-attribute (partial attribute-definition :db/id))
 (def ^:private define-attribute (partial attribute-definition :db/ident))
 
+(defn- ->map
+  "turn a datomic entity into a real Clojure map"
+  [entity]
+  (select-keys entity (keys entity)))
+
 ;; API
 
 (defn mkattr [dbadapter nm ty card & options]
@@ -94,10 +103,20 @@
     (define-attribute nm ty card)))
 
 (defn mkrel [dbadapter nm attr-nms]
-  {:pre [(keyword? nm) (every? keyword? attr-nms)]}
-  {:db/ident                    nm
-   :db.entity/attrs             (vec attr-nms)
-   :relation/ordered-attributes (vec attr-nms)})
+  {:pre [(keyword? nm) (every? keyword? attr-nms) (< 0 (count attr-nms))]}
+  (cond-> {:db/ident        nm
+           :db.entity/attrs (vec attr-nms)}
+    (= 1 (count attr-nms))
+    (assoc :relation/single-attribute (first attr-nms))
+
+    (< 1 (count attr-nms))
+    (assoc :relation/ordered-attributes (vec attr-nms))))
+
+(defn rel [dbadapter nm]
+  (let [r (->map (e dbadapter nm))]
+    (cond-> r
+      (contains? r :relation/single-attribute)
+      (assoc :relation/ordered-attributes [(:relation/single-attribute r)]))))
 
 (defn mkent [dbadapter nm attrs vals]
   {:pre [(keyword? nm)]}
