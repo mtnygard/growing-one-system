@@ -14,6 +14,6 @@
              :repl    {:main-opts ["-m" "gos.repl"]}
              :uberjar {:extra-deps {mdiin/cambada {:git/url "https://github.com/mdiin/cambada"
                                                    :sha     "18958e1f12798593efd70e4c67825167416d9cef"}}
-                       :main-opts  ["-m" "cambada.uberjar" "-m" "gos.repl"]}}
+                       :main-opts  ["-m" "cambada.uberjar" "-m" "gos.repl" "--app-version" "1.0.1"]}}
  :mvn/repos {"central" {:url "http://central.maven.org/maven2/"}
              "clojars" {:url "https://repo.clojars.org/"}}}
