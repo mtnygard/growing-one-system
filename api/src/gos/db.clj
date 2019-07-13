@@ -7,6 +7,9 @@
             [gos.db :as db]
             [clojure.edn :as edn]))
 
+(def ^:dynamic *debug-query* nil)
+(def ^:dynamic *debug-transaction* nil)
+
 ;; Kernel attributes
 
 (def relation-attributes
@@ -65,6 +68,8 @@
     (dclassic/db conn))
   Q
   (q [this query args]
+    (when *debug-query*
+      (println 'query query (list* args)))
     (apply dclassic/q query (db this) (list* args)))
   (e [this eid]
     (dclassic/entity (db this) eid)))

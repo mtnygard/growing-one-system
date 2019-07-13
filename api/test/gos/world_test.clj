@@ -186,6 +186,16 @@
         (is (ok? result))
         (is (= #{["rajesh" 25]} (-> result :response :body :query-result))))))
 
+  (testing "an instance's fields are kept separate"
+    (after ["attr name string one;"
+            "relation seats name name name name;"
+            "seats \"a\" \"b\" \"c\" \"d\";"]
+      (binding [db/*debug-query* true]
+        (let [result (world/process (world/current-state (fix/adapter) {}) "seats ?a ?b ?c ?d;")]
+          (is (= "" (-> result :response :body :query-result)))))
+
+      ))
+
   (testing "querying a single-value relation returns the set of values"
     (after ["attr name string one;"
             "relation person name;"
