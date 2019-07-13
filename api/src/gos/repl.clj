@@ -1,12 +1,25 @@
 (ns gos.repl
   (:refer-clojure :exclude [eval print read])
   (:gen-class)
-  (:require [clojure.pprint :as pp]
+  (:require [clojure.java.io :as io]
+            [clojure.pprint :as pp :refer [pprint]]
             [clojure.string :as str]
             [clojure.tools.cli :as cli]
             [gos.db :as db]
-            [gos.world :as world]
-            [clojure.java.io :as io]))
+            [gos.world :as world])
+  (:import clojure.lang.LineNumberingPushbackReader
+           java.io.StringReader))
+
+;; ----------------------------------------
+;; Error reporting
+
+(defn err->msg
+  "Helper to return an error message string from an exception."
+  [^Throwable e]
+  e)
+
+;; ----------------------------------------
+;; Command line definition
 
 (def cli-options
   ;; An option with a required argument
@@ -14,6 +27,9 @@
    #_["-d" "--on-disk DIR" "Keep data in a directory on local disk." :id :on-disk]
    ["-e" "--eval SCRIPT" "Load SCRIPT before taking interactive commands. May be filename or URL"]
    ["-h" "--help"]])
+
+;; ----------------------------------------
+;; Old Read-Eval-Print-Loop
 
 (defn- prompt
   []
@@ -76,6 +92,128 @@
             ::quit nil
             (recur sources db (str accum " " l))))))))
 
+;; ----------------------------------------
+;; New Read-Eval-Print-Loop
+
+;; This is closely modeled on Clojure's own REPL.
+;; See clojure.main
+
+(defn skip-if-eol
+  "If the next character on stream s is a newline, skips it, otherwise
+  leaves the stream untouched. Returns :line-start, :stream-end, or :body
+  to indicate the relative location of the next character on s. The stream
+  must either be an instance of LineNumberingPushbackReader or duplicate
+  its behavior of both supporting .unread and collapsing all of CR, LF, and
+  CRLF to a single \\newline."
+  [s]
+  (let [c (.read s)]
+    (cond
+     (= c (int \newline)) :line-start
+     (= c -1) :stream-end
+     :else (do (.unread s c) :body))))
+
+
+(defn- error-phase [ph e] (ex-info nil {:error/phase ph} e))
+(def read-error (partial error-phase :read-source))
+(def eval-error (partial error-phase :evaluate))
+(def print-error (partial error-phase :print-result))
+
+(defn- repl-prompt
+  []
+  (printf " => ")
+  (flush))
+
+(defn- skip-whitespace
+  "Like Clojure's own REPL reader, except that '#' is the comment
+  character and commas are not whitespace."
+  [s]
+  (loop [c (.read s)]
+    (cond
+      (= c (int \newline))                   :line-start
+      (= c -1)                               :stream-end
+      (or (Character/isWhitespace (char c))) (recur (.read s))
+      :else                                  (do (.unread s c) :body))))
+
+(defn read-statement
+  ([s]
+   (read-statement s (StringBuffer. "")))
+  ([s buf]
+   (let [c (.read s)]
+     (if (= -1 c)
+       (throw (read-error (ex-info "Unexpected EOF" {:partial-statement (.toString buf)})))
+       (do
+         (.append buf (char c))
+         (if (= (int \;) c)
+           (.toString buf)
+           (recur s buf)))))))
+
+(defn repl-read
+  "Return the next non-comment, non-whitespace statement. May span multiple lines."
+  [request-prompt request-exit]
+  (or ({:line-start request-prompt :stream-end request-exit}
+       (skip-whitespace *in*))
+    (let [input (read-statement *in*)]
+      (println "repl-read. input = " input)
+      (skip-if-eol *in*)
+      input)))
+
+(defn repl-caught
+  [e]
+  (binding [*out* *err*]
+    (print (err->msg e))
+    (flush)))
+
+(defn- repl-run
+  [init datomic-uri]
+  (let [db              (db/classic datomic-uri)
+        prompt          repl-prompt
+        need-prompt     (if (instance? LineNumberingPushbackReader *in*)
+                          #(.atLineStart ^LineNumberingPushbackReader *in*)
+                          #(identity true))
+        flush           flush
+        read            repl-read
+        eval            (fn [input]
+                          (try
+                            (eval db input)
+                            (catch Exception e (throw (eval-error e)))))
+        print           pprint
+        caught          repl-caught
+        request-prompt  (Object.)
+        request-exit    (Object.)
+        read-eval-print (fn []
+                          (try
+                            (let [input (try
+                                          (read request-prompt request-exit)
+                                          (catch Exception e (throw (read-error e))))]
+                              (or (#{request-prompt request-exit} input)
+                                (let [value (eval input)]
+                                  (try
+                                    (print value)
+                                    (catch Throwable e
+                                      (throw (print-error e)))))))
+                            (catch Throwable e
+                              (caught e))))]
+    (try
+      (when init (init))
+      (catch Throwable e
+        (caught e)))
+    (prompt)
+    (flush)
+    (loop []
+      (when-not
+          (try
+            (identical? (read-eval-print) request-exit)
+            (catch Throwable e
+              (caught e)
+              nil))
+          (when (need-prompt)
+            (prompt)
+            (flush)))
+      (recur))))
+
+
+
+
 (defn usage [options-summary]
   (->>
     ["Interact with your data."
@@ -129,5 +267,6 @@
     (if exit-message
       (exit ok? exit-message)
       (do
-        (run (inputs options) datomic-uri)
+        #_(run (inputs options) datomic-uri)
+        (repl-run nil datomic-uri)
         (shutdown-agents)))))
