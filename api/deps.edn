@@ -10,6 +10,10 @@
  :aliases   {:dev     {:main-opts   ["-m" "frenpl"]
                        :extra-paths ["dev" "test"]
                        :extra-deps  {frenpl {:local/root "../../frenpl"}}}
+             :test    {:extra-paths ["test"]
+                       :extra-deps  {com.cognitect/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git"
+                                                                :sha     "209b64504cb3bd3b99ecfec7937b358a879f55c1"}}
+                       :main-opts   ["-m" "cognitect.test-runner"]}
              :run     {:main-opts ["-m" "gos.main" "src/config.fern"]
                        :jvm-opts  ["--add-modules" "java.xml.bind"]}
              :repl    {:main-opts ["-m" "gos.repl"]}

@@ -2,7 +2,7 @@
   (:require [clojure.edn :as edn]
             [clojure.string :as str]
             [datomic.api :as dclassic]
-            [datomic.client.api :as client]
+            [datomic.client.api :as dclient]
             [fern :as f]
             [gos.char :as char]
             [gos.db :as db]
@@ -55,9 +55,9 @@
 
 (defn client [config db-name]
   (let [client (dclient/client config)
-        _      (client/create-database client {:db-name db-name})
-        conn   (client/connect client {:db-name db-name})
-        _      @(client/transact conn {:tx-data relation-attributes})]
+        _      (dclient/create-database client {:db-name db-name})
+        conn   (dclient/connect client {:db-name db-name})
+        _      @(dclient/transact conn {:tx-data relation-attributes})]
     (->DClient client conn)))
 
 (defrecord DClassic [uri conn]
