@@ -123,10 +123,10 @@
   (update state :tx-data conjv (db/mkattr (:dbadapter state) nm ty card)))
 
 (defmethod ->effect :relation [state [_ nm attr-nms]]
-  (update state :tx-data conjv (db/mkrel (:dbadapter state) nm attr-nms)))
+  (update state :tx-data concat (db/mkrel (:dbadapter state) nm attr-nms)))
 
 (defmethod ->effect :instances [{:keys [dbadapter] :as state} [_ ivals]]
-  (update state :tx-data concat
+  (update state :tx-data conjv
     (doall
       (for [[nm & vals] ivals
             :let        [attrs (relation-attributes (relation dbadapter nm))]]
@@ -219,11 +219,9 @@
 
 ;; todo - consider: can re-frame be used on server side?
 (defn apply-transactions [{:keys [tx-data] :as state}]
-;;  (println "apply-transactions" )
-;;  (clojure.pprint/pprint tx-data)
   (cond-> state
     (some? tx-data)
-    (assoc :tx-result @(db/transact (:dbadapter state) tx-data))))
+    (assoc :tx-result (mapv #(deref (db/transact (:dbadapter state) %)) tx-data))))
 
 (defn response [state]
   (assoc state :response (ok (select-keys state [:problems :tx-result :query-result]))))

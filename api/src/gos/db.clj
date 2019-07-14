@@ -1,11 +1,13 @@
 (ns gos.db
-  (:require [datomic.client.api :as dclient]
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
             [datomic.api :as dclassic]
-            [io.pedestal.interceptor :as i]
             [datomic.client.api :as client]
             [fern :as f]
+            [gos.char :as char]
             [gos.db :as db]
-            [clojure.edn :as edn]))
+            [gos.seq :refer [conjv]]
+            [io.pedestal.interceptor :as i]))
 
 (def ^:dynamic *debug-query* nil)
 (def ^:dynamic *debug-transaction* nil)
@@ -13,19 +15,18 @@
 ;; Kernel attributes
 
 (def relation-attributes
-  [{:db/ident       :relation/ordered-attributes
-    :db/valueType   :db.type/tuple
-    :db/tupleType   :db.type/keyword
-    :db/cardinality :db.cardinality/one
-    :db/doc         "Defines the order of attributes on a relation"}
-   {:db/ident       :relation/single-attribute
-    :db/valueType   :db.type/keyword
-    :db/cardinality :db.cardinality/one
-    :db/doc         "Used when a relation is a set, because Datomic tuples must be at least 2 elements long"}
-   {:db/ident       :entity/relation
+  [{:db/ident       :entity/relation
     :db/valueType   :db.type/ref
     :db/cardinality :db.cardinality/one
-    :db/doc         "Backreference from an entity to the relation it is part of."}])
+    :db/doc         "Backreference from an entity to the relation it is part of."}
+   {:db/ident       :relation/attributes
+    :db/valueType   :db.type/ref
+    :db/cardinality :db.cardinality/many
+    :db/doc         "A relation has many attributes. This defines the types."}
+   {:db/ident       :attribute/derives
+    :db/valueType   :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Attribute types are copied on use. This points back to the original."}])
 
 ;; Paper over API differences between cloud and on-prem
 
@@ -62,6 +63,8 @@
 (defrecord DClassic [uri conn]
   Tx
   (transact [this tx-data]
+    (when *debug-transaction*
+      (println 'transact tx-data))
     (dclassic/transact conn tx-data))
   Db
   (db [this]
@@ -95,33 +98,60 @@
 (def ^:private define-attribute (partial attribute-definition :db/ident))
 
 (defn- ->map
-  "turn a datomic entity into a real Clojure map"
-  [entity]
-  (select-keys entity (keys entity)))
+  "Turn a datomic entity into an ordinary map."
+  [e]
+  (select-keys e (keys e)))
+
+(defn- attr-names [kw]
+  (map #(keyword (name kw) (str "a_" %)) (iterate inc 0)))
+
+(defn rel-attribute? [relnm x]
+  (= (name relnm) (namespace x)))
+
+(defn kw->ordinal [kw]
+  (let [n (name kw)]
+    (if-not (str/starts-with? n "a_")
+      nil
+      (let [n (subs n 2)]
+        (if-not (every? char/digit? n)
+          nil
+          (Integer/parseInt n))))))
+
+(defn- derive-type
+  [dbadapter from to]
+  (let [original (->map (e dbadapter from))]
+    (merge (dissoc original :db/id)
+      {:db/ident          to
+       :attribute/derives from})))
+
+(defn- derived-types
+  "Make copies of the attributes used in this relation."
+  [dbadapter relnm type-nms]
+  (mapv #(derive-type dbadapter %1 %2) type-nms (attr-names relnm)))
+
+(defn- relation-entity
+  "Construct a Datomic entity to represent the relation itself."
+  [nm type-nms]
+  {:db/ident nm
+   :relation/attributes (->> nm attr-names (take (count type-nms)) set)})
 
 ;; API
 
 (defn mkattr [dbadapter nm ty card & options]
   {:pre [(keyword? nm) (keyword? ty) (keyword? card)]}
   (if (attribute-exists? dbadapter nm)
-    (update-attribute nm ty card)
-    (define-attribute nm ty card)))
+    [(update-attribute nm ty card)]
+    [(define-attribute nm ty card)]))
 
-(defn mkrel [dbadapter nm attr-nms]
-  {:pre [(keyword? nm) (every? keyword? attr-nms) (< 0 (count attr-nms))]}
-  (cond-> {:db/ident        nm
-           :db.entity/attrs (vec attr-nms)}
-    (= 1 (count attr-nms))
-    (assoc :relation/single-attribute (first attr-nms))
-
-    (< 1 (count attr-nms))
-    (assoc :relation/ordered-attributes (vec attr-nms))))
+(defn mkrel [dbadapter nm type-nms]
+  {:pre [(keyword? nm) (every? keyword? type-nms) (< 0 (count type-nms))]}
+  [(derived-types dbadapter nm type-nms)
+   [(relation-entity nm type-nms)]])
 
 (defn rel [dbadapter nm]
-  (let [r (->map (e dbadapter nm))]
-    (cond-> r
-      (contains? r :relation/single-attribute)
-      (assoc :relation/ordered-attributes [(:relation/single-attribute r)]))))
+  (let [r     (->map (e dbadapter nm))
+        attrs (sort-by kw->ordinal (:relation/attributes r))]
+    (assoc r :relation/ordered-attributes attrs)))
 
 (defn mkent [dbadapter nm attrs vals]
   {:pre [(keyword? nm)]}
