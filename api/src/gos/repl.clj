@@ -44,9 +44,9 @@
   [s]
   (let [c (.read s)]
     (cond
-     (= c (int \newline)) :line-start
-     (= c -1) :stream-end
-     :else (do (.unread s c) :body))))
+      (= c (int \newline)) :line-start
+      (= c -1)             :stream-end
+      :else                (do (.unread s c) :body))))
 
 
 (defn- error-phase [ph e] (ex-info nil {:error/phase ph} e))
@@ -59,39 +59,25 @@
   (printf " => ")
   (flush))
 
-(defn- skip-whitespace
-  "Like Clojure's own REPL reader, except that '#' is the comment
-  character and commas are not whitespace."
-  [s]
-  (loop [c (.read s)]
-    (cond
-      (= c (int \newline))                   :line-start
-      (= c -1)                               :stream-end
-      (or (Character/isWhitespace (char c))) (recur (.read s))
-      :else                                  (do (.unread s c) :body))))
-
 (defn read-statement
   ([s]
-   (read-statement s (StringBuffer. "")))
+   (read-statement s ""))
   ([s buf]
    (let [c (.read s)]
      (if (= -1 c)
-       (throw (read-error (ex-info "Unexpected EOF" {:partial-statement (.toString buf)})))
-       (do
-         (.append buf (char c))
+       :quit
+       (let [buf (str buf (char c))]
          (if (= (int \;) c)
-           (.toString buf)
+           buf
            (recur s buf)))))))
 
 (defn repl-read
   "Return the next non-comment, non-whitespace statement. May span multiple lines."
-  [request-prompt request-exit]
-  (or ({:line-start request-prompt :stream-end request-exit}
-       (skip-whitespace *in*))
-    (let [input (read-statement *in*)]
-      (println "repl-read. input = " input)
-      (skip-if-eol *in*)
-      input)))
+  []
+  (let [input (read-statement *in*)]
+    (when-not (= :quit input)
+      (skip-if-eol *in*))
+    input))
 
 (defn- repl-eval
   [db x]
@@ -114,6 +100,7 @@
         need-prompt     (if (instance? LineNumberingPushbackReader *in*)
                           #(.atLineStart ^LineNumberingPushbackReader *in*)
                           #(identity true))
+        init            (or init #())
         flush           flush
         read            repl-read
         eval            (fn [input]
@@ -122,14 +109,12 @@
                             (catch Exception e (throw (eval-error e)))))
         print           repl-print
         caught          repl-caught
-        request-prompt  (Object.)
-        request-exit    (Object.)
         read-eval-print (fn []
                           (try
                             (let [input (try
-                                          (read request-prompt request-exit)
+                                          (read)
                                           (catch Exception e (throw (read-error e))))]
-                              (or (#{request-prompt request-exit} input)
+                              (or (#{:quit} input)
                                 (let [value (eval input)]
                                   (try
                                     (print value)
@@ -138,22 +123,21 @@
                             (catch Throwable e
                               (caught e))))]
     (try
-      (when init (init))
+      (init)
       (catch Throwable e
         (caught e)))
     (prompt)
     (flush)
     (loop []
-      (when-not
-          (try
-            (identical? (read-eval-print) request-exit)
+      (when-not (try
+            (= :quit (read-eval-print))
             (catch Throwable e
               (caught e)
               nil))
           (when (need-prompt)
             (prompt)
-            (flush)))
-      (recur))))
+            (flush))
+          (recur)))))
 
 
 
@@ -198,6 +182,12 @@
     in-memory "datomic:mem://repl"
     on-disk   "datomic:dev://localhost:4334"))
 
+(defn- repl-init [{:keys [eval] :as options}]
+  (println "options: " options)
+  (println "eval: " eval)
+  nil
+  )
+
 (defn- inputs [{:keys [eval] :as options}]
   (println "options: " options)
   (println "eval: " eval)
@@ -211,6 +201,5 @@
     (if exit-message
       (exit ok? exit-message)
       (do
-        #_(run (inputs options) datomic-uri)
-        (repl-run nil datomic-uri)
+        (repl-run (repl-init options) datomic-uri)
         (shutdown-agents)))))
