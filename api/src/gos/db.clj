@@ -5,7 +5,6 @@
             [datomic.client.api :as dclient]
             [fern :as f]
             [gos.char :as char]
-            [gos.db :as db]
             [gos.seq :refer [conjv]]
             [io.pedestal.interceptor :as i]))
 

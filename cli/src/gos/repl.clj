@@ -1,13 +1,16 @@
 (ns gos.repl
-  (:refer-clojure :exclude [eval print read])
   (:gen-class)
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pp :refer [pprint]]
             [clojure.string :as str]
             [clojure.tools.cli :as cli]
+            [clojure.datafy :refer [datafy nav]]
             [gos.db :as db]
             [gos.seq :as seq]
-            [gos.world :as world])
+            [gos.spec-print :as sprint]
+            [gos.world :as world]
+            [datomic.api :as d]
+            [clojure.spec-alpha2 :as s])
   (:import clojure.lang.LineNumberingPushbackReader
            java.io.StringReader))
 
@@ -88,7 +91,7 @@
     (world/process (world/with-input state input))
     (catch Throwable t t)))
 
-(def repl-print clojure.pprint/pprint)
+(def repl-print (comp sprint/print datafy))
 
 (defn repl-caught
   [e]
@@ -146,10 +149,12 @@
                             (let [input (try
                                           (read)
                                           (catch Exception e (throw (read-error e))))]
-                              (or (#{:quit} input)
+                              (or
+                                (= :quit input)
                                 (let [value (eval state input)]
                                   (try
                                     (print value)
+                                    value
                                     (catch Throwable e
                                       (throw (print-error e)))))))
                             (catch Throwable e
@@ -161,7 +166,8 @@
     (prompt)
     (flush)
     (loop [state state]
-      (when-not (try
+      (when-not
+          (try
             (= :quit (read-eval-print state))
             (catch Throwable e
               (caught e)
@@ -170,6 +176,13 @@
             (prompt)
             (flush))
           (recur state)))))
+
+(s/def ::error (s/keys :req-un [::trace ::cause ::via]))
+(sprint/use ::error
+  (fn [ex]
+    (print (:cause ex))
+    (print "\n\nException stack")
+    (pp/print-table (map #(select-keys % [:type :message]) (:via ex)))))
 
 (defn usage [options-summary]
   (->>
@@ -187,8 +200,7 @@
 
 (defn exit [status msg]
   (println msg)
-;;  (System/exit status)
-  )
+  (System/exit status))
 
 (def datomic-memory-uri "datomic:mem://repl")
 
