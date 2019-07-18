@@ -6,6 +6,7 @@
             [clojure.string :as str]
             [clojure.tools.cli :as cli]
             [gos.db :as db]
+            [gos.seq :as seq]
             [gos.world :as world])
   (:import clojure.lang.LineNumberingPushbackReader
            java.io.StringReader))
@@ -25,7 +26,9 @@
   ;; An option with a required argument
   [["-m" "--in-memory" "Keep data in memory." :default true :id :in-memory]
    #_["-d" "--on-disk DIR" "Keep data in a directory on local disk." :id :on-disk]
-   ["-e" "--eval SCRIPT" "Load SCRIPT before taking interactive commands. May be filename or URL"]
+   ["-e" "--eval SCRIPT" "Load SCRIPT before taking interactive commands. May be filename or URL"
+    :default []
+    :assoc-fn (fn [m k v] (update m k seq/conjv v))]
    ["-h" "--help"]])
 
 ;; ----------------------------------------
@@ -80,9 +83,9 @@
     input))
 
 (defn- repl-eval
-  [db x]
+  [state input]
   (try
-    (world/process (world/current-state db {}) x)
+    (world/process (world/with-input state input))
     (catch Throwable t t)))
 
 (def repl-print clojure.pprint/pprint)
@@ -93,29 +96,58 @@
     (pprint (err->msg e))
     (flush)))
 
+;; during init, we break on any error and do not continue reading
+(defn- repl-run-init
+  [stream state]
+  (let [print     repl-print
+        caught    repl-caught
+        eval      (fn [state input]
+                    (try
+                      (repl-eval state input)
+                      (catch Exception e (throw (eval-error e)))))
+        read-eval (fn [state]
+                    (try
+                      (let [input (try
+                                    (repl-read)
+                                    (catch Exception e (throw (read-error e))))]
+                        (or (#{:quit} input)
+                          (eval state input)))
+                      (catch Throwable e
+                        (caught e)
+                        :quit)))]
+    (binding [*in* stream]
+      (loop [state state]
+        (if-not
+            (try
+              (= :quit (read-eval state))
+              (catch Throwable e
+                (caught e)
+                nil))
+          (recur state)
+          state)))))
+
 (defn- repl-run
-  [init datomic-uri]
-  (let [db              (db/classic datomic-uri)
-        prompt          repl-prompt
+  [init state]
+  (let [prompt          repl-prompt
         need-prompt     (if (instance? LineNumberingPushbackReader *in*)
                           #(.atLineStart ^LineNumberingPushbackReader *in*)
                           #(identity true))
-        init            (or init #())
+        init            (or init (fn [_]))
         flush           flush
         read            repl-read
-        eval            (fn [input]
+        eval            (fn [state input]
                           (try
-                            (repl-eval db input)
+                            (repl-eval state input)
                             (catch Exception e (throw (eval-error e)))))
         print           repl-print
         caught          repl-caught
-        read-eval-print (fn []
+        read-eval-print (fn [state]
                           (try
                             (let [input (try
                                           (read)
                                           (catch Exception e (throw (read-error e))))]
                               (or (#{:quit} input)
-                                (let [value (eval input)]
+                                (let [value (eval state input)]
                                   (try
                                     (print value)
                                     (catch Throwable e
@@ -123,21 +155,21 @@
                             (catch Throwable e
                               (caught e))))]
     (try
-      (init)
+      (init state)
       (catch Throwable e
         (caught e)))
     (prompt)
     (flush)
-    (loop []
+    (loop [state state]
       (when-not (try
-            (= :quit (read-eval-print))
+            (= :quit (read-eval-print state))
             (catch Throwable e
               (caught e)
               nil))
           (when (need-prompt)
             (prompt)
             (flush))
-          (recur)))))
+          (recur state)))))
 
 (defn usage [options-summary]
   (->>
@@ -179,24 +211,25 @@
     in-memory "datomic:mem://repl"
     on-disk   "datomic:dev://localhost:4334"))
 
-(defn- repl-init [{:keys [eval] :as options}]
-  (println "options: " options)
-  (println "eval: " eval)
-  nil
-  )
+(defn- nested-continuations
+  [f xs]
+  (reduce (fn [inner x] (fn [state] (f x (inner state)))) identity xs))
 
-(defn- inputs [{:keys [eval] :as options}]
-  (println "options: " options)
+(defn- repl-init [{:keys [eval] :as options}]
   (println "eval: " eval)
-  (if eval
-    [[(io/reader eval) false] [*in* true]]
-    [[*in* true]]))
+
+  ;; deferred continuation style
+  ;; build a chain of evaluations of
+  ;; (repl-run-init reader (repl-run-init reader ,,,))
+  ;; Return a partial that awaits the initial state
+  (let [sources (map #(LineNumberingPushbackReader. (io/reader %)) eval)]
+    (nested-continuations repl-run-init sources)))
 
 (defn -main [& args]
   (let [{:keys [options exit-message ok?]} (validate-args args)
         datomic-uri                        (choose-data-location options)]
     (if exit-message
       (exit ok? exit-message)
-      (do
-        (repl-run (repl-init options) datomic-uri)
+      (let [state (world/initial-state (db/classic datomic-uri))]
+        (repl-run (repl-init options) state)
         (shutdown-agents)))))

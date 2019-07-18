@@ -245,4 +245,4 @@
              (let [{:keys [conn dbadapter]} request
                    world             (-> request :path-params :world)
                    body              (first (vals (select-keys request [:transit-params :json-params :edn-params])))]
-               (assoc ctx :response (process (current-state dbadapter world) body))))}))
+               (assoc ctx :response (process (with-input (initial-state dbadapter) body)))))}))

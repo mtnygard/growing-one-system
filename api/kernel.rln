@@ -1,6 +1,1 @@
 attr name string one;
-
-relation system name;
-relation location name;
-relation system-at name name;
-
