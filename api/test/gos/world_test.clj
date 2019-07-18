@@ -8,7 +8,7 @@
             [fern :as f]))
 
 (defn- p [body]
-  (world/parse {} body))
+  (world/parse {:body body}))
 
 (deftest parse-inputs
   (testing "Empty input is accepted"
@@ -43,11 +43,11 @@
     (is (= :query (ffirst (:parsed (p "person ?n;")))))))
 
 (defn- process
-  [start-state body]
-  (world/process (dissoc start-state :tx-data) body))
+  [state]
+  (world/process (dissoc state :tx-data)))
 
 (defn- start-state []
-  (world/current-state (fix/adapter) {}))
+  (world/initial-state (fix/adapter)))
 
 (def ^:private attr? fix/lookup-attribute)
 
@@ -64,7 +64,7 @@
 
 (defmacro after [strs & assertions]
   `(fix/with-database []
-     (let [~'end-state (reduce process (start-state) ~strs)]
+     (let [~'end-state (reduce #(process (world/with-input %1 %2)) (start-state) ~strs)]
        ~@assertions)))
 
 (deftest attribute
@@ -182,7 +182,7 @@
             "attr age long one;"
             "relation person-age name age;"
             "person-age \"rajesh\" 25;"]
-      (let [result (world/process (world/current-state (fix/adapter) {}) "person-age ?name 25;")]
+      (let [result (world/process (world/with-input (start-state) "person-age ?name 25;"))]
         (is (ok? result))
         (is (= #{["rajesh" 25]} (-> result :response :body :query-result))))))
 
@@ -192,7 +192,7 @@
             "person \"douglas\";"
             "person \"sarai\";"
             "person \"rajesh\";"]
-      (let [result (world/process (world/current-state (fix/adapter) {}) "person ?n;")]
+      (let [result (world/process (world/with-input (start-state) "person ?n;"))]
         (is (ok? result))
         (is (= #{["rajesh"] ["sarai"] ["douglas"]} (-> result :response :body :query-result))))))
 
@@ -204,9 +204,9 @@
             "attr location string one;"
             "relation assignment name location;"
             "assignment \"rajesh\" \"southlake\";"]
-      (let [result (world/process
-                     (world/current-state (fix/adapter) {})
-                     "person-age ?name 25, assignment ?name \"southlake\";")]
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "person-age ?name 25, assignment ?name \"southlake\";"))]
         (is (ok? result))
         (is (= #{["rajesh" 25 "southlake"]} (-> result :response :body :query-result))))))
 
@@ -216,9 +216,9 @@
             "relation foo a b;"
             "foo \"cake\" \"pie\";"
             "foo \"cake\" \"cake\";"]
-      (let [result (world/process
-                     (world/current-state (fix/adapter) {})
-                     "foo ?a ?a;")]
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "foo ?a ?a;"))]
         (is (ok? result))
         (is (= #{["cake"]} (-> result :response :body :query-result)))))))
 
@@ -227,5 +227,7 @@
     (after ["attr name string one;"
             "relation seats name name name name;"
             "seats \"a\" \"b\" \"c\" \"d\";"]
-      (let [result (world/process (world/current-state (fix/adapter) {}) "seats ?a ?b ?c ?d;")]
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "seats ?a ?b ?c ?d;"))]
         (is (= #{["a" "b" "c" "d"]} (-> result :response :body :query-result)))))))

@@ -198,11 +198,13 @@
 
 ;; Processing a request
 
-(defn current-state [dbadapter world]
-  {:dbadapter dbadapter
-   :world     world})
+(defn initial-state [dbadapter]
+  {:dbadapter dbadapter})
 
-(defn parse [state body]
+(defn with-input [state input]
+  (assoc state :body input))
+
+(defn parse [{:keys [body] :as state}]
   (let [result (insta/parse grammar body)]
     (if (insta/failure? result)
       (with-problems state (insta/get-failure result))
@@ -227,9 +229,9 @@
   (assoc state :response (ok (select-keys state [:problems :tx-result :query-result]))))
 
 (defn process
-  [start-state body]
+  [start-state]
   (and-then-> start-state
-    (parse body)
+    (parse)
     (determine-effects)
     (answer-queries)
     (apply-transactions)

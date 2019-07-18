@@ -139,9 +139,6 @@
             (flush))
           (recur)))))
 
-
-
-
 (defn usage [options-summary]
   (->>
     ["Interact with your data."
