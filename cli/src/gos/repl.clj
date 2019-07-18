@@ -192,7 +192,17 @@
                             (dissoc :at))
                       (:via ex)))))
 
-#_(s/def ::problems (s/keys :req-un []))
+(s/def ::transaction-result (s/select [] [:response [:body [:tx-result]]]))
+
+(defn- eavta?     [d] (mapv #(nth d %) [0 1 2 3 4]))
+(defn- datom->map [d] (zipmap [:e :a :v :tx :added?] (eavta? d)))
+(defn- attribute-name [e db-adapter] (:db/ident (db/e db-adapter e)))
+
+(sprint/use ::transaction-result
+  (fn [result]
+    (let [datom-maps (-> result :response :body :tx-result (->> (mapcat :tx-data) (map datom->map)))
+          datom-maps (map #(update % :a attribute-name (-> result :dbadapter)) datom-maps)]
+      (pp/print-table datom-maps))))
 
 (defn usage [options-summary]
   (->>
