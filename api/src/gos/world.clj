@@ -6,7 +6,8 @@
             [gos.seq :refer [conjv sequential-tree]]
             [instaparse.core :as insta]
             [io.pedestal.interceptor :as i]
-            [clojure.edn :as edn]))
+            [clojure.edn :as edn]
+            [gos.date :as date]))
 
 (defn relation [dbadapter nm] (db/rel dbadapter nm))
 (def  relation-attributes :relation/ordered-attributes)
@@ -168,10 +169,11 @@
     statement = name value+
     name = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
     type = #\"[a-zA-Z_][a-zA-Z0-9]*\"
-    value = symbol | string-literal | long-literal | boolean-literal
+    value = symbol | string-literal | long-literal | boolean-literal | date-literal
     symbol = #\"[a-zA_Z_0-9\\?][a-zA_Z_0-9\\?\\-\\$%*]*\"
     string-literal = #\"\\\"(\\.|[^\\\"])*\\\"\"
     long-literal = #\"-?[0-9]+\"
+    date-literal = #\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"
     boolean-literal = 'true' | 'false'
     cardinality = 'one' | 'many'"
    :auto-whitespace whitespace-or-comments))
@@ -183,17 +185,19 @@
 
 (defn- transform [parse-tree]
   (insta/transform
-    {:attribute      (fn [n t c] [:attribute n t c])
-     :name           keyword
-     :type           keyword
-     :cardinality    keyword
-     :value          identity
-     :symbol         symbol
-     :string-literal edn/read-string
-     :long-literal   edn/read-string
-     :statement      vector
-     :statements     statements
-     :relation       (fn [_ r & xs] [:relation r xs])}
+    {:attribute       (fn [n t c] [:attribute n t c])
+     :name            keyword
+     :type            keyword
+     :cardinality     keyword
+     :value           identity
+     :symbol          symbol
+     :string-literal  edn/read-string
+     :long-literal    edn/read-string
+     :boolean-literal edn/read-string
+     :date-literal    date/yyyy-mm-dd
+     :statement       vector
+     :statements      statements
+     :relation        (fn [_ r & xs] [:relation r xs])}
    parse-tree))
 
 ;; Processing a request
@@ -223,7 +227,11 @@
 (defn apply-transactions [{:keys [tx-data] :as state}]
   (cond-> state
     (some? tx-data)
-    (assoc :tx-result (mapv #(deref (db/transact (:dbadapter state) %)) tx-data))))
+    (assoc :tx-result (mapv #(update
+                               (deref (db/transact (:dbadapter state) %))
+                               :tx-data
+                               seq)
+                        tx-data))))
 
 (defn response [state]
   (assoc state :response (ok (select-keys state [:problems :tx-result :query-result]))))

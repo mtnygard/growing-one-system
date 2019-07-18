@@ -192,7 +192,10 @@
                             (dissoc :at))
                       (:via ex)))))
 
-(s/def ::transaction-result (s/select [] [:response [:body [:tx-result]]]))
+(s/def ::datom #(instance? datomic.db.Datum %))
+(s/def ::tx-data (s/schema {:tx-data (s/* ::datom)}))
+(s/def ::tx-response-body (s/schema {:tx-result (s/+ ::tx-data)}))
+(s/def ::transaction-result (s/schema {:response (s/schema {:body ::tx-response-body})}))
 
 (defn- eavta?     [d] (mapv #(nth d %) [0 1 2 3 4]))
 (defn- datom->map [d] (zipmap [:e :a :v :tx :added?] (eavta? d)))
@@ -203,6 +206,13 @@
     (let [datom-maps (-> result :response :body :tx-result (->> (mapcat :tx-data) (map datom->map)))
           datom-maps (map #(update % :a attribute-name (-> result :dbadapter)) datom-maps)]
       (pp/print-table datom-maps))))
+
+(comment
+  (s/def ::query-result (s/select [] [:response [:body [:query-result]]]))
+  (sprint/use ::query-result
+    (fn [result]
+      (println "it was a query")
+      )))
 
 (defn usage [options-summary]
   (->>
@@ -265,3 +275,17 @@
       (let [state (world/initial-state (db/classic datomic-uri))]
         (repl-run (repl-init options) state)
         (shutdown-agents)))))
+
+
+(comment
+
+  ;; to use gos REPL from Clojure REPL
+  (def dbadapter (db/classic datomic-memory-uri))
+  (defn p [s]
+    (repl-print
+      (repl-eval
+        (world/initial-state dbadapter)
+        s)))
+
+
+  )

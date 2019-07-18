@@ -1,1 +1,4 @@
 attr name string one;
+attr completed? boolean one;
+attr start-at instant one;
+attr end-at instant one;

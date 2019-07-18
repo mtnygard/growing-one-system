@@ -19,6 +19,7 @@
    (print @spec-printers value))
   ([registry value]
    (let [[s f] (first (matching-printers registry value))]
+     (println "matched on spec " s)
      (if s
        (f (s/conform s value))
        (pprint value)))))
