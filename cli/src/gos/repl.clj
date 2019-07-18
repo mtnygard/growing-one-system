@@ -55,10 +55,12 @@
       :else                (do (.unread s c) :body))))
 
 
-(defn- error-phase [ph e] (ex-info nil {:error/phase ph} e))
-(def read-error (partial error-phase :read-source))
-(def eval-error (partial error-phase :evaluate))
-(def print-error (partial error-phase :print-result))
+(def ^:private phase-names {:evaluate "evaluation" :read "reading" :print "printing"})
+
+(defn- error-phase [msg ph e] (ex-info msg {:error/phase ph} e))
+(def read-error (partial error-phase "Error reading" :read-source))
+(def eval-error (partial error-phase "Error during evaluation" :evaluate))
+(def print-error (partial error-phase "Error printing" :print-result))
 
 (defn- repl-prompt
   []
@@ -178,11 +180,19 @@
           (recur state)))))
 
 (s/def ::error (s/keys :req-un [::trace ::cause ::via]))
+
+(defn- join-lines [s] (str/replace s #"\n" ""))
+
 (sprint/use ::error
   (fn [ex]
     (print (:cause ex))
-    (print "\n\nException stack")
-    (pp/print-table (map #(select-keys % [:type :message]) (:via ex)))))
+    (print "\nException stack")
+    (pp/print-table (map #(-> %
+                            (update :message join-lines)
+                            (dissoc :at))
+                      (:via ex)))))
+
+#_(s/def ::problems (s/keys :req-un []))
 
 (defn usage [options-summary]
   (->>
