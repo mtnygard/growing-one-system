@@ -29,70 +29,6 @@
    ["-h" "--help"]])
 
 ;; ----------------------------------------
-;; Old Read-Eval-Print-Loop
-
-(defn- prompt
-  []
-  (printf " => ")
-  (flush))
-
-(defn- read
-  [source interactive?]
-  (when interactive?
-    (prompt))
-  (binding [*in* source]
-    (let [line (read-line)]
-      (cond
-        (nil? line)      ::eof
-        (= ":quit" line) ::quit
-        :else            line))))
-
-(defn- print
-  [x]
-  (cond
-    (and (map? x) (contains? x :response)) (pp/pprint (:response x))
-    (and (map? x) (contains? x :problems)) (pp/pprint (:problems x))
-    :else                                  (pp/pprint x)))
-
-(defn- eval
-  [db x]
-  (try
-    (world/process (world/current-state db {}) x)
-    (catch Throwable t t)))
-
-(defn has-command? [buf]
-  (str/index-of buf ";"))
-
-(defn first-command [buf]
-  (let [split-point (inc (has-command? buf))]
-    [(subs buf 0 split-point) (subs buf split-point)]))
-
-(defn warn [& msg]
-  (println "Warning: " (apply str msg)))
-
-(defn run
-  [sources datomic-uri]
-  (loop [sources sources
-         db      (db/classic datomic-uri)
-         accum   ""]
-    (when-let [[source interactive?] (first sources)]
-      (if (has-command? accum)
-        (let [[command remainder] (first-command accum)]
-          (when-not (= ::quit command)
-            (let [v (eval db command)]
-              (print v)
-              (recur sources db remainder))))
-        (let [l (read source interactive?)]
-          (case l
-            ::eof (do
-                    (when (str/blank? accum)
-                      ;; TODO - include file and line info here
-                      (warn "Ignoring unfinished command " accum))
-                    (recur (rest sources) db ""))
-            ::quit nil
-            (recur sources db (str accum " " l))))))))
-
-;; ----------------------------------------
 ;; New Read-Eval-Print-Loop
 
 ;; This is closely modeled on Clojure's own REPL.
@@ -157,10 +93,18 @@
       (skip-if-eol *in*)
       input)))
 
+(defn- repl-eval
+  [db x]
+  (try
+    (world/process (world/current-state db {}) x)
+    (catch Throwable t t)))
+
+(def repl-print clojure.pprint/pprint)
+
 (defn repl-caught
   [e]
   (binding [*out* *err*]
-    (print (err->msg e))
+    (pprint (err->msg e))
     (flush)))
 
 (defn- repl-run
@@ -174,9 +118,9 @@
         read            repl-read
         eval            (fn [input]
                           (try
-                            (eval db input)
+                            (repl-eval db input)
                             (catch Exception e (throw (eval-error e)))))
-        print           pprint
+        print           repl-print
         caught          repl-caught
         request-prompt  (Object.)
         request-exit    (Object.)
