@@ -192,27 +192,36 @@
                             (dissoc :at))
                       (:via ex)))))
 
-(s/def ::datom #(instance? datomic.db.Datum %))
-(s/def ::tx-data (s/schema {:tx-data (s/* ::datom)}))
-(s/def ::tx-response-body (s/schema {:tx-result (s/+ ::tx-data)}))
-(s/def ::transaction-result (s/schema {:response (s/schema {:body ::tx-response-body})}))
+(s/def ::tx-data (s/coll-of #(instance? datomic.db.Datum %)))
+(s/def ::ok-response (s/schema [::tx-result ::query-result]))
+(s/def ::tx-response (s/select ::ok-response [:tx-result {:tx-result (s/coll-of (s/select ::tx-data [::tx-data]))}]))
+(s/def ::q-response (s/select ::ok-response [:query-result {:query-result set?}]))
 
 (defn- eavta?     [d] (mapv #(nth d %) [0 1 2 3 4]))
 (defn- datom->map [d] (zipmap [:e :a :v :tx :added?] (eavta? d)))
 (defn- attribute-name [e db-adapter] (:db/ident (db/e db-adapter e)))
 
-(sprint/use ::transaction-result
+(sprint/use ::tx-response
   (fn [result]
     (let [datom-maps (-> result :response :body :tx-result (->> (mapcat :tx-data) (map datom->map)))
           datom-maps (map #(update % :a attribute-name (-> result :dbadapter)) datom-maps)]
-      (pp/print-table datom-maps))))
+      (if-not (empty? datom-maps)
+        (pp/print-table datom-maps)
+        (pp/pprint result)))))
 
 (comment
-  (s/def ::query-result (s/select [] [:response [:body [:query-result]]]))
-  (sprint/use ::query-result
+
+  (sprint/use ::q-response
     (fn [result]
-      (println "it was a query")
-      )))
+      (let [matched (-> result :query-result)
+            fields  (mapv name (-> result :query-fields))
+            fields  (if (empty? fields)
+                      (let [field-count (reduce max 0 (map count matched))]
+                        (map str (range field-count))))]
+        (pp/print-table (map #(zipmap fields %) matched)))))
+
+
+  )
 
 (defn usage [options-summary]
   (->>
