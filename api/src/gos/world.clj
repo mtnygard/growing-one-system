@@ -54,11 +54,10 @@
   [dbadapter q]
   (db/q dbadapter (dissoc q :args) (:args q)))
 
-(defmulti build-datalog
-  (fn [_ x] (when (keyword? (first x)) :eq)))
+(defmulti build-datalog (fn [_ [op & _]] op))
 
-(defmethod build-datalog :eq
-  [dbadapter [relnm pattern]]
+(defmethod build-datalog ::relation
+  [dbadapter [_ relnm pattern]]
   (let [rel   (relation dbadapter relnm)
         attrs (relation-attributes rel)
         ident (:db/ident rel)
@@ -69,6 +68,14 @@
      :in    (in-clause lv pattern)
      :where (into [[esym :entity/relation ident]] where)
      :args  (remove lvar? pattern)}))
+
+(defmethod build-datalog ::unify
+  [dbadapter [_ & pat]]
+  {:where [[(list* '= pat)]]})
+
+(defmethod build-datalog ::disjunction
+  [dbadapter [_ & pat]]
+  {:where [[(list* '!= pat)]]})
 
 ;; this form will be used when a query is parsed from text.
 (defn query-relations [dbadapter xs]
@@ -83,7 +90,7 @@
   (memoize
     (fn [dbadapter relnm]
       (fn [pattern]
-        (query-relations dbadapter [[relnm pattern]])))))
+        (query-relations dbadapter [[::relation relnm pattern]])))))
 
 ;; Sanity checks
 (defn assert-has-attributes [nm attrs]
@@ -136,15 +143,25 @@
           (assert-sufficient-values nm attrs vals)
           (db/mkent dbadapter nm attrs vals))))))
 
-(defmethod ->effect :query [{:keys [dbadapter] :as state} [_ clauses]]
-  (assoc state :query
-    (doall
-      (for [[nm & pattern] clauses
-            :let           [attrs (relation-attributes (relation dbadapter nm))]]
-        (do
-          (assert-has-attributes nm attrs)
-          (assert-sufficient-pattern nm attrs pattern)
-          [nm pattern])))))
+(defmulti query-clause (fn [_ [op & _]] op))
+
+(defmethod query-clause ::unify
+  [_ x]
+  (vec x))
+
+(defmethod query-clause ::disjunction
+  [_ x]
+  (vec x))
+
+(defmethod query-clause :default
+  [{:keys [dbadapter] :as state} [nm & pattern]]
+  (let [attrs (relation-attributes (relation dbadapter nm))]
+    (assert-has-attributes nm attrs)
+    (assert-sufficient-pattern nm attrs pattern)
+    [::relation nm pattern]))
+
+(defmethod ->effect :query [state [_ clauses]]
+  (assoc state :query (mapv #(query-clause state %) clauses)))
 
 ;; Parsing inputs
 
@@ -166,7 +183,7 @@
     attribute = <'attr'> name type cardinality
     relation = 'relation' name name+
     statements = statement ( <','> statement )*
-    statement = name value+
+    statement = (name / operator) value+
     name = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
     type = #\"[a-zA-Z_][a-zA-Z0-9]*\"
     value = symbol | string-literal | long-literal | boolean-literal | date-literal
@@ -175,7 +192,8 @@
     long-literal = #\"-?[0-9]+\"
     date-literal = #\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"
     boolean-literal = 'true' | 'false'
-    cardinality = 'one' | 'many'"
+    cardinality = 'one' | 'many'
+    operator = '=' | '!='"
    :auto-whitespace whitespace-or-comments))
 
 (defn- statements [& vs]
@@ -183,10 +201,13 @@
     [:query vs]
     [:instances vs]))
 
+(def ^:private operators {"=" ::unify "!=" ::disjunction})
+
 (defn- transform [parse-tree]
   (insta/transform
     {:attribute       (fn [n t c] [:attribute n t c])
      :name            keyword
+     :operator        operators
      :type            keyword
      :cardinality     keyword
      :value           identity
