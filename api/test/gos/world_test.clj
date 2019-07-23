@@ -210,31 +210,59 @@
         (is (ok? result))
         (is (= #{["rajesh" 25 "southlake"]} (-> result :response :body :query-result))))))
 
-  (testing "variables can have ground values forced"
-    (testing "junction"
-      (after ["attr name string one;"
-              "attr age long one;"
-              "relation person-age name age;"
-              "person-age \"douglas\" 25;"
-              "person-age \"sarai\"   39;"
-              "person-age \"rajesh\"  25;"]
-        (let [result (world/process (world/with-input
-                                      (start-state)
-                                      "person-age ?name ?age, = ?name \"rajesh\";"))]
-          (is (ok? result))
-          (is (= #{["rajesh" 25]} (-> result :response :body :query-result))))))
-    (testing "disjunction"
-      (after ["attr name string one;"
-              "attr age long one;"
-              "relation person-age name age;"
-              "person-age \"douglas\" 25;"
-              "person-age \"sarai\"   39;"
-              "person-age \"rajesh\"  25;"]
-        (let [result (world/process (world/with-input
-                                      (start-state)
-                                      "person-age ?name 25, != ?name \"rajesh\";"))]
-          (is (ok? result))
-          (is (= #{["douglas" 25]} (-> result :response :body :query-result)))))))
+  (testing "junction"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age \"douglas\" 25;"
+            "person-age \"sarai\"   39;"
+            "person-age \"rajesh\"  25;"]
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "person-age ?name ?age, = ?name \"rajesh\";"))]
+        (is (ok? result))
+        (is (= #{["rajesh" 25]} (-> result :response :body :query-result))))))
+
+  (testing "disjunction"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age \"douglas\" 25;"
+            "person-age \"sarai\"   39;"
+            "person-age \"rajesh\"  25;"]
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "person-age ?name 25, != ?name \"rajesh\";"))]
+        (is (ok? result))
+        (is (= #{["douglas" 25]} (-> result :response :body :query-result))))))
+
+  (testing "inequality"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age \"douglas\" 25;"
+            "person-age \"sarai\"   39;"
+            "person-age \"rajesh\"  25;"]
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "person-age ?name ?age, < ?age 30;"))]
+        (is (ok? result))
+        (is (= #{["douglas" 25] ["rajesh" 25]} (-> result :response :body :query-result))))
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "person-age ?name ?age, <= ?age 25;"))]
+        (is (ok? result))
+        (is (= #{["douglas" 25] ["rajesh" 25]} (-> result :response :body :query-result))))
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "person-age ?name ?age, > ?age 30;"))]
+        (is (ok? result))
+        (is (= #{["sarai" 39]} (-> result :response :body :query-result))))
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "person-age ?name ?age, >= ?age 39;"))]
+        (is (ok? result))
+        (is (= #{["sarai" 39]} (-> result :response :body :query-result))))))
 
   (testing "self-joins are allowed"
     (after ["attr a string one;"

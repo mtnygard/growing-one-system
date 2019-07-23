@@ -69,13 +69,9 @@
      :where (into [[esym :entity/relation ident]] where)
      :args  (remove lvar? pattern)}))
 
-(defmethod build-datalog ::unify
+(defmethod build-datalog ::operator
   [dbadapter [_ & pat]]
-  {:where [[(list* '= pat)]]})
-
-(defmethod build-datalog ::disjunction
-  [dbadapter [_ & pat]]
-  {:where [[(list* '!= pat)]]})
+  {:where [[(list* pat)]]})
 
 ;; this form will be used when a query is parsed from text.
 (defn query-relations [dbadapter xs]
@@ -143,15 +139,11 @@
           (assert-sufficient-values nm attrs vals)
           (db/mkent dbadapter nm attrs vals))))))
 
-(defmulti query-clause (fn [_ [op & _]] op))
+(defmulti query-clause (fn [_ [op & _]] (if (vector? op) (first op) op)))
 
-(defmethod query-clause ::unify
-  [_ x]
-  (vec x))
-
-(defmethod query-clause ::disjunction
-  [_ x]
-  (vec x))
+(defmethod query-clause ::operator
+  [_ [x & xs]]
+  (into x xs))
 
 (defmethod query-clause :default
   [{:keys [dbadapter] :as state} [nm & pattern]]
@@ -193,7 +185,7 @@
     date-literal = #\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"
     boolean-literal = 'true' | 'false'
     cardinality = 'one' | 'many'
-    operator = '=' | '!='"
+    operator = '=' | '!=' | '<' | '<=' | '>' | '>='"
    :auto-whitespace whitespace-or-comments))
 
 (defn- statements [& vs]
@@ -201,13 +193,10 @@
     [:query vs]
     [:instances vs]))
 
-(def ^:private operators {"=" ::unify "!=" ::disjunction})
-
 (defn- transform [parse-tree]
   (insta/transform
     {:attribute       (fn [n t c] [:attribute n t c])
      :name            keyword
-     :operator        operators
      :type            keyword
      :cardinality     keyword
      :value           identity
@@ -218,7 +207,8 @@
      :date-literal    date/yyyy-mm-dd
      :statement       vector
      :statements      statements
-     :relation        (fn [_ r & xs] [:relation r xs])}
+     :relation        (fn [_ r & xs] [:relation r xs])
+     :operator        (fn [x] [::operator (symbol x)])}
    parse-tree))
 
 ;; Processing a request
