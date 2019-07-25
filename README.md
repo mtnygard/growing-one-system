@@ -51,20 +51,20 @@ You won't be able to run these machines directly. They're part of the infrastruc
 The API module offers a CLI to let you have a conversation with your
 model of the world. You can run the CLI in dev mode like this:
 
-    cd api
+    cd cli
     clj -A:repl
 
 Enter statements exactly as you would through the UI.
 
 To package the CLI for standalone use:
 
-    cd api
+    cd cli
     clj -A:uberjar
 
-The resulting uberjar will be in `target/api-1.0.0-SNAPSHOT-standalone.jar`.
+The resulting uberjar will be in `target/cli-1.0.0-SNAPSHOT-standalone.jar`.
 
 To run the uberjar:
 
-    java -jar target/api-1.0.0-SNAPSHOT-standalone.jar
+    java -jar target/cli-1.0.0-SNAPSHOT-standalone.jar
 
 That's a mouthful, so you'll probably want to make an alias for it.
