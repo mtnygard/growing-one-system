@@ -4,6 +4,12 @@ Knowledge management system
 
 # Developer setup
 
+## Skipping Developer Setup
+
+If you just want to try the examples from "Some Commands, Some
+Queries" below, you can download a standalone jar file from the
+"releases" tab.
+
 ## Local Checkouts
 
 This application uses a number of pre-release libraries and personal
