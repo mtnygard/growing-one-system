@@ -6,9 +6,8 @@ Knowledge management system
 
 ## Skipping Developer Setup
 
-If you just want to try the examples from "Some Commands, Some
-Queries" below, you can download a standalone jar file from the
-"releases" tab.
+If you just want to try the examples from [Some Commands, Some Queries](#making-a-model) below, you can download a standalone jar file from the
+[releases](https://github.com/mtnygard/growing-one-system/releases) tab.
 
 ## Local Checkouts
 
@@ -96,8 +95,9 @@ That's a mouthful, so you'll probably want to make an alias for it.
 Right now, there are two storage methods supported. By default, all
 data lives only in memory.
 
-You can use `-d` with a URL to point to a Datomic Pro database for
-local storage. (Future releases will support Datomic Cloud as well.)
+You can use `-d` to point to a local Datomic Pro database running in
+dev mode for local storage. (Future releases will support Datomic Pro
+remote and Datomic Cloud.)
 
 # Initialization
 

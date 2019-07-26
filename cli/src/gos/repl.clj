@@ -151,8 +151,8 @@
                             (let [input (try
                                           (read)
                                           (catch Exception e (throw (read-error e))))]
-                              (or
-                                (= :quit input)
+                              (if (= :quit input)
+                                :quit
                                 (let [value (eval state input)]
                                   (try
                                     (print value)
