@@ -209,19 +209,14 @@
         (pp/print-table datom-maps)
         (pp/pprint result)))))
 
-(comment
-
-  (sprint/use ::q-response
-    (fn [result]
-      (let [matched (-> result :query-result)
-            fields  (mapv name (-> result :query-fields))
-            fields  (if (empty? fields)
-                      (let [field-count (reduce max 0 (map count matched))]
-                        (map str (range field-count))))]
-        (pp/print-table (map #(zipmap fields %) matched)))))
-
-
-  )
+(sprint/use ::q-response
+  (fn [result]
+    (let [matched (-> result :query-result)
+          fields  (mapv name (-> result :query-fields))
+          fields  (if (empty? fields)
+                    (let [field-count (reduce max 0 (map count matched))]
+                      (map str (range field-count))))]
+      (pp/print-table (map #(zipmap fields %) matched)))))
 
 (defn usage [options-summary]
   (->>

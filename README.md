@@ -4,6 +4,22 @@ Knowledge management system
 
 # Developer setup
 
+## Local Checkouts
+
+This application uses a number of pre-release libraries and personal
+forks. You will need to check out the following repositories in the
+parent directory that contains this repository:
+
+    git clone git@github.com:mtnygard/vase
+    git clone git@github.com:jez/pandoc-sidenote
+    git clone git@github.com:mtnygard/fern
+    git clone git@github.com:clojure/spec-alpha2
+    git clone git@github.com:cognitect/test-runner
+    git clone git@github.com:mtnygard/frenpl
+
+If you are missing any of these, you'll get an error like "Error
+building classpath. Manifest type not detected..."
+
 ## Repository Hygiene
 
 We use [Pre-commit](https://pre-commit.com/) to manage a lot of
