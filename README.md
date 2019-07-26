@@ -85,6 +85,20 @@ To run the uberjar:
 
 That's a mouthful, so you'll probably want to make an alias for it.
 
+# Where Did My Data Go?
+
+Right now, there are two storage methods supported. By default, all
+data lives only in memory.
+
+You can use `-d` with a URL to point to a Datomic Pro database for
+local storage. (Future releases will support Datomic Cloud as well.)
+
+# Initialization
+
+You can keep commands in a file (or several files). If you supply `-e
+_filename_` one or more times, those files will be loaded in order
+before your REPL prompt appears.
+
 # Some Commands, Some Queries
 
 Once you start the CLI REPL, you'll get a prompt like `=>`. That's
