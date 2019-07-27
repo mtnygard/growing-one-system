@@ -129,13 +129,38 @@
 (defmethod ->effect :relation [state [_ nm attr-nms]]
   (update state :tx-data concat (db/mkrel (:dbadapter state) nm attr-nms)))
 
+;; if :repeat appears in the vals vector, hold the stuff to the left
+;; constant, and chunk the stuff on the right as needed to fill the #
+;; attrs
+(defn- left-of [v xs]
+  (take-while #(not= v %) xs))
+
+(defn- right-of [v xs]
+  (next (drop-while #(not= v %) xs)))
+
+(defn unpack-repeats
+  [width vals]
+  (let [constant-part  (left-of :repeat vals)
+        foreach-part   (right-of :repeat vals)
+        missing-values (- width (count constant-part))
+        leftover       (if (= 0 missing-values) 0 (rem (count foreach-part) missing-values))]
+    (if (empty? foreach-part)
+      [constant-part]
+      (do
+        (assert (= 0 leftover) (str "Not enough values, need a multiple of " missing-values ". Had " leftover " extra values."))
+        (map concat
+          (repeat constant-part)
+          (partition-all missing-values (right-of :repeat vals)))))))
+
 (defmethod ->effect :instances [{:keys [dbadapter] :as state} [_ ivals]]
   (update state :tx-data conjv
     (doall
       (for [[nm & vals] ivals
-            :let        [attrs (relation-attributes (relation dbadapter nm))]]
+            :let        [rel   (relation dbadapter nm)
+                         attrs (relation-attributes rel)
+                         _     (assert-has-attributes nm attrs)]
+            vals        (unpack-repeats (count attrs) vals)]
         (do
-          (assert-has-attributes nm attrs)
           (assert-sufficient-values nm attrs vals)
           (db/mkent dbadapter nm attrs vals))))))
 
@@ -175,7 +200,8 @@
     attribute = <'attr'> name type cardinality
     relation = 'relation' name name+
     statements = statement ( <','> statement )*
-    statement = (name / operator) value+
+    statement = (name / operator) repeat? value ( repeat? value)*
+    repeat = <':'>
     name = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
     type = #\"[a-zA-Z_][a-zA-Z0-9]*\"
     value = symbol | string-literal | long-literal | boolean-literal | date-literal
@@ -187,6 +213,8 @@
     cardinality = 'one' | 'many'
     operator = '=' | '!=' | '<' | '<=' | '>' | '>='"
    :auto-whitespace whitespace-or-comments))
+
+
 
 (defn- statements [& vs]
   (if (has-lvars? vs)
@@ -207,6 +235,7 @@
      :date-literal    date/yyyy-mm-dd
      :statement       vector
      :statements      statements
+     :repeat          (constantly :repeat)
      :relation        (fn [_ r & xs] [:relation r xs])
      :operator        (fn [x] [::operator (symbol x)])}
    parse-tree))

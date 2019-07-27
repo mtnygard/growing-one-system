@@ -30,7 +30,7 @@ diagram-kind:
 	requirements-diagram     "req" "Requirement Diagram"
 	sequence-diagram         "sd"  "Sequence Diagram"
 	use-case-diagram         "uc"  "Use Case Diagram"
-	state-machine-diagram    "stm" "State Machine Diagram"
+	state-machine-diagram    "stm" "State Machine Diagram";
 
 relation diagram->model-element-type (id in diagram) (ids in model-element-type);
 diagram->model-element-type:
@@ -42,7 +42,7 @@ diagram->model-element-type:
 	requirement-diagram      #{package model model-library requirement}
 	sequence-diagram         #{interaction}
 	state-machine-diagram    #{state-machine}
-	use-case-diagram         #{package model model-library}
+	use-case-diagram         #{package model model-library};
 
 relation diagram-instance id;
 relation version          id label;

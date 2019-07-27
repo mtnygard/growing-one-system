@@ -285,3 +285,36 @@
                                     (start-state)
                                     "seats ?a ?b ?c ?d;"))]
         (is (= #{["a" "b" "c" "d"]} (-> result :response :body :query-result)))))))
+
+(deftest colon-is-shorthand-for-repetition
+  (testing "in instances"
+    (after ["attr id symbol one;"
+            "relation diagram id;"
+            "diagram: sysml-diagram behavior-diagram requirements-diagram;"]
+      (let [result (world/process (world/with-input (start-state)
+                                    "diagram ?a;"))]
+        (is (= #{['sysml-diagram] ['behavior-diagram] ['requirements-diagram]}
+              (-> result :response :body :query-result)))))
+
+    (after ["attr id symbol one;"
+            "relation specialize id id;"
+            "specialize sysml-diagram: behavior-diagram requirements-diagram structural-diagram;"]
+      (let [result (world/process (world/with-input (start-state)
+                                    "specialize ?par ?cld;"))]
+        (is (= #{'[sysml-diagram behavior-diagram]
+                 '[sysml-diagram requirements-diagram]
+                 '[sysml-diagram structural-diagram]}
+              (-> result :response :body :query-result)))))
+
+    (after ["attr id symbol one;"
+            "attr label string one;"
+            "relation diagram-kind id label label;"
+            "diagram-kind:
+               activity-diagram         \"act\" \"Activity Diagram\"
+               block-definition-diagram \"bdd\" \"Block Definition Diagram\"
+               internal-block-diagram   \"ibd\" \"Internal Block Diagram\"
+               package-diagram          \"pkg\" \"Package Diagram\";"]
+      (let [result (world/process (world/with-input (start-state)
+                                    "diagram-kind ?kind ?tag ?label;"))]
+        (is (= 4 (count
+                   (-> result :response :body :query-result))))))))
