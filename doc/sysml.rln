@@ -1,0 +1,105 @@
+// Describe the metamodel (the SysML language itself)
+attr id symbol one;
+attr ids symbol many;
+attr label string one;
+attr description string one;
+
+relation diagram id;
+
+diagram:
+  sysml-diagram
+  behavior-diagram
+  requirements-diagram
+  structural-diagram
+  activity-diagram
+  sequence-diagram
+  use-case-diagram
+  state-machine-diagram
+  block-definition-diagram
+  internal-block-diagram
+  parametric-diagram
+  package-diagram;
+
+relation diagram-kind (id in diagram) label label;
+diagram-kind:
+	activity-diagram         "act" "Activity Diagram"
+	block-definition-diagram "bdd" "Block Definition Diagram"
+	internal-block-diagram   "ibd" "Internal Block Diagram"
+	package-diagram          "pkg" "Package Diagram"
+	parametric-diagram       "par" "Parametric Diagram"
+	requirements-diagram     "req" "Requirement Diagram"
+	sequence-diagram         "sd"  "Sequence Diagram"
+	use-case-diagram         "uc"  "Use Case Diagram"
+	state-machine-diagram    "stm" "State Machine Diagram"
+
+relation diagram->model-element-type (id in diagram) (ids in model-element-type);
+diagram->model-element-type:
+	activity                 #{activity}
+	block-definition-diagram #{block constraint-block package model model-library}
+	internal-block-diagram   #{block}
+	package-diagram          #{package model model-library profile view}
+	parametric-diagram       #{block constraint-block}
+	requirement-diagram      #{package model model-library requirement}
+	sequence-diagram         #{interaction}
+	state-machine-diagram    #{state-machine}
+	use-case-diagram         #{package model model-library}
+
+relation diagram-instance id;
+relation version          id label;
+relation completion       id label;
+relation description      id description;
+relation reference        id description;
+
+relation specialize id id;
+relation contains id id;
+relation depends id id;
+relation component id id;
+
+specialize sysml-diagram:
+	behavior-diagram
+	requirements-diagram
+	structural-diagram;
+
+specialize behavior-diagram:
+	activity-diagram
+	sequence-diagram
+	use-case-diagram
+	state-machine-diagram;
+
+specialize structural-diagram:
+	block-diagram
+	internal-block-diagram
+	parametric-diagram
+	package-diagram;
+
+attr stereotype-name string one;
+
+stereotype-name:
+	"Block"
+	"Value Type";
+
+
+relation block id;
+relation requirement id;
+
+relation stereotype id stereotype-name;
+relation label id label;
+relation property id label description;
+
+relation diagram-header (id in diagram-kind) (id in model-element-type) label label description;
+
+// Describe the example from "A Practical Guide to SysML", Section 3.4
+
+requirement r1;
+requirement-label r1 "Automobile Specification";
+
+requirement r2;
+requirement-label r2 "Passenger and Baggage Load";
+
+requirement r3;
+requirement-label r3 "Vehicle Performance";
+
+requirement r4;
+requirement-label r4 "Riding Comfort";
+
+contains r1: r2 r3 r4;
