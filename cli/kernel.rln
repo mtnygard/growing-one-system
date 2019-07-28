@@ -1,4 +1,8 @@
+attr id symbol one;
 attr name string one;
+attr label string one;
+attr description string one;
+
 attr completed? boolean one;
 attr start-at instant one;
 attr end-at instant one;
