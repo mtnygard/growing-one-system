@@ -7,22 +7,23 @@
   {:added "1.3"}
   ([ks rows]
      (when (seq rows)
-       (let [widths (map
-                     (fn [k]
-                       (apply max (count (str k)) (map #(count (str (get % k))) rows)))
-                     ks)
-             spacers (map #(apply str (repeat % "-")) widths)
-             fmts (map #(str "%" % "s") widths)
-             fmt-row (fn [leader divider trailer row]
-                       (str leader
-                            (apply str (interpose divider
-                                                  (for [[col fmt] (map vector (map #(get row %) ks) fmts)]
-                                                    (format fmt (str col)))))
-                            trailer))]
+       (let [widths         (map
+                              (fn [k]
+                                (apply max (count (str k)) (map #(count (str (get % k))) rows)))
+                              ks)
+             spacers        (map #(apply str (repeat % "-")) widths)
+             header-spacers (map #(apply str (repeat % "=")) widths)
+             fmts           (map #(str "%" % "s") widths)
+             fmt-row        (fn [leader divider trailer row]
+                              (str leader
+                                (apply str (interpose divider
+                                             (for [[col fmt] (map vector (map #(get row %) ks) fmts)]
+                                               (format fmt (str col)))))
+                                trailer))]
          (println)
          (println (fmt-row "+-" "-+-" "-+" (zipmap ks spacers)))
          (println (fmt-row "| " " | " " |" (zipmap ks ks)))
-         (println (fmt-row "+-" "-+-" "-+" (zipmap ks spacers)))
+         (println (fmt-row "+=" "=+=" "=+" (zipmap ks header-spacers)))
          (doseq [row rows]
            (println (fmt-row "| " " | " " |" row))
            (println (fmt-row "+-" "-+-" "-+" (zipmap ks spacers)))))))
