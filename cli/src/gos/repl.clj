@@ -10,7 +10,8 @@
             [gos.spec-print :as sprint]
             [gos.world :as world]
             [datomic.api :as d]
-            [clojure.spec-alpha2 :as s])
+            [clojure.spec-alpha2 :as s]
+            [gos.table :refer [print-table]])
   (:import clojure.lang.LineNumberingPushbackReader
            java.io.StringReader))
 
@@ -187,10 +188,10 @@
   (fn [ex]
     (print (:cause ex))
     (print "\nException stack")
-    (pp/print-table (map #(-> %
-                            (update :message join-lines)
-                            (dissoc :at))
-                      (:via ex)))))
+    (print-table (map #(-> %
+                         (update :message join-lines)
+                         (dissoc :at))
+                   (:via ex)))))
 
 (s/def ::tx-data (s/coll-of #(instance? datomic.db.Datum %)))
 (s/def ::ok-response (s/schema [::tx-result ::query-result]))
@@ -206,7 +207,7 @@
     (let [datom-maps (-> result :response :body :tx-result (->> (mapcat :tx-data) (map datom->map)))
           datom-maps (map #(update % :a attribute-name (-> result :dbadapter)) datom-maps)]
       (if-not (empty? datom-maps)
-        (pp/print-table datom-maps)
+        (print-table datom-maps)
         (pp/pprint result)))))
 
 (sprint/use ::q-response
@@ -216,7 +217,7 @@
           fields  (if (empty? fields)
                     (let [field-count (reduce max 0 (map count matched))]
                       (map str (range field-count))))]
-      (pp/print-table (map #(zipmap fields %) matched)))))
+      (print-table (map #(zipmap fields %) matched)))))
 
 (defn usage [options-summary]
   (->>
