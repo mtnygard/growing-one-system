@@ -21,6 +21,7 @@ parent directory that contains this repository:
     git clone git@github.com:clojure/spec-alpha2
     git clone git@github.com:cognitect/test-runner
     git clone git@github.com:mtnygard/frenpl
+    git clone git@github.com:mdiin/cambada
 
 If you are missing any of these, you'll get an error like "Error
 building classpath. Manifest type not detected..."
