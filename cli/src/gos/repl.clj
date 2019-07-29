@@ -1,5 +1,6 @@
 (ns gos.repl
   (:gen-class)
+  (:refer-clojure :exclude [print])
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pp :refer [pprint]]
             [clojure.string :as str]
@@ -30,6 +31,7 @@
   ;; An option with a required argument
   [["-m" "--in-memory" "Keep data in memory." :default true :id :in-memory]
    #_["-d" "--on-disk DIR" "Keep data in a directory on local disk." :id :on-disk]
+   ["-q" "--quit"        "Exit after running the script(s). Only makes sense with -e"]
    ["-e" "--eval SCRIPT" "Load SCRIPT before taking interactive commands. May be filename or URL"
     :default []
     :assoc-fn (fn [m k v] (update m k seq/conjv v))]
@@ -83,102 +85,87 @@
 (defn repl-read
   "Return the next non-comment, non-whitespace statement. May span multiple lines."
   []
-  (let [input (read-statement *in*)]
-    (when-not (= :quit input)
-      (skip-if-eol *in*))
-    input))
+  (try
+    (let [input (read-statement *in*)]
+      (when-not (= :quit input)
+        (skip-if-eol *in*))
+      input)
+    (catch Exception e (throw (read-error e)))))
 
 (defn- repl-eval
   [state input]
   (try
     (world/process (world/with-input state input))
-    (catch Throwable t t)))
+    (catch Throwable t (throw (eval-error t)))))
 
-(def repl-print (comp sprint/print datafy))
+(defn- repl-print
+  [state value]
+  (try
+    (when (:print state)
+      (-> value datafy sprint/print))
+    (catch Exception e (throw (print-error e)))))
 
-(defn repl-caught
+(defn- repl-caught
   [e]
   (binding [*out* *err*]
     (pprint (err->msg e))
     (flush)))
 
+;; beware side effects
+(defn need-prompt []
+  (if (instance? LineNumberingPushbackReader *in*)
+    (.atLineStart ^LineNumberingPushbackReader *in*)
+    false))
+
+(defn- quit! [state] (assoc state :quit! true))
+(defn- continue? [state] (not (contains? state :quit!)))
+(defn- continue [state] (dissoc state :quit!))
+(defn- print [state b] (assoc state :print b))
+
 ;; during init, we break on any error and do not continue reading
 (defn- repl-run-init
   [stream state]
-  (let [print     repl-print
-        caught    repl-caught
-        eval      (fn [state input]
-                    (try
-                      (repl-eval state input)
-                      (catch Exception e (throw (eval-error e)))))
-        read-eval (fn [state]
-                    (try
-                      (let [input (try
-                                    (repl-read)
-                                    (catch Exception e (throw (read-error e))))]
-                        (or (#{:quit} input)
-                          (eval state input)))
-                      (catch Throwable e
-                        (caught e)
-                        :quit)))]
+  (let [state           (print (continue state) false)
+        read-eval-print (fn [state]
+                          (try
+                            (let [input (repl-read)]
+                              (if (= :quit input)
+                                (quit! state)
+                                (let [value (repl-eval state input)]
+                                  (repl-print state value)
+                                  value)))
+                            (catch Throwable e
+                              (repl-caught e)
+                              (quit! state))))]
     (binding [*in* stream]
       (loop [state state]
-        (if-not
-            (try
-              (= :quit (read-eval state))
-              (catch Throwable e
-                (caught e)
-                nil))
-          (recur state)
-          state)))))
+        (let [next-state (read-eval-print state)]
+          (if-not (continue? next-state)
+            next-state
+            (recur next-state)))))))
 
 (defn- repl-run
   [init state]
-  (let [prompt          repl-prompt
-        need-prompt     (if (instance? LineNumberingPushbackReader *in*)
-                          #(.atLineStart ^LineNumberingPushbackReader *in*)
-                          #(identity true))
-        init            (or init (fn [_]))
-        flush           flush
-        read            repl-read
-        eval            (fn [state input]
+  (let [read-eval-print (fn [state]
                           (try
-                            (repl-eval state input)
-                            (catch Exception e (throw (eval-error e)))))
-        print           repl-print
-        caught          repl-caught
-        read-eval-print (fn [state]
-                          (try
-                            (let [input (try
-                                          (read)
-                                          (catch Exception e (throw (read-error e))))]
+                            (let [input (repl-read)]
                               (if (= :quit input)
-                                :quit
-                                (let [value (eval state input)]
-                                  (try
-                                    (print value)
-                                    value
-                                    (catch Throwable e
-                                      (throw (print-error e)))))))
+                                (quit! state)
+                                (let [value (repl-eval state input)]
+                                  (repl-print state value)
+                                  value)))
                             (catch Throwable e
-                              (caught e))))]
-    (try
-      (init state)
-      (catch Throwable e
-        (caught e)))
-    (prompt)
-    (flush)
-    (loop [state state]
-      (when-not
-          (try
-            (= :quit (read-eval-print state))
-            (catch Throwable e
-              (caught e)
-              nil))
-          (when (need-prompt)
-            (prompt)
-            (flush))
-          (recur state)))))
+                              (repl-caught e))))
+        state           (try (init state)
+                             (catch Throwable e (repl-caught e)))]
+    (when-not (:quit-after-init? state)
+      (repl-prompt)
+      (loop [state (print (continue state) true)]
+        (let [next-state (read-eval-print state)]
+          (when (continue? next-state)
+            (when (need-prompt)
+              (repl-prompt))
+            (recur next-state)))))))
 
 (s/def ::error (s/keys :req-un [::trace ::cause ::via]))
 
@@ -263,8 +250,6 @@
   (reduce (fn [inner x] (fn [state] (f x (inner state)))) identity xs))
 
 (defn- repl-init [{:keys [eval] :as options}]
-  (println "eval: " eval)
-
   ;; deferred continuation style
   ;; build a chain of evaluations of
   ;; (repl-run-init reader (repl-run-init reader ,,,))
@@ -272,12 +257,18 @@
   (let [sources (map #(LineNumberingPushbackReader. (io/reader %)) eval)]
     (nested-continuations repl-run-init sources)))
 
+(defn- initial-state [options]
+  (let [datomic-uri (choose-data-location options)
+        base-state  (world/initial-state (db/classic datomic-uri))]
+    (cond-> base-state
+      (:quit options)
+      (assoc :quit-after-init? true))))
+
 (defn -main [& args]
-  (let [{:keys [options exit-message ok?]} (validate-args args)
-        datomic-uri                        (choose-data-location options)]
+  (let [{:keys [options exit-message ok?]} (validate-args args)]
     (if exit-message
       (exit ok? exit-message)
-      (let [state (world/initial-state (db/classic datomic-uri))]
+      (let [state (initial-state options)]
         (repl-run (repl-init options) state)
         (shutdown-agents)))))
 
