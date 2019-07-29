@@ -248,6 +248,9 @@
 (defn with-input [state input]
   (assoc state :body input))
 
+(defn cleanse [state]
+  (dissoc state :response :tx-data :parsed :tx-result :query-result :problems :query))
+
 (defn parse [{:keys [body] :as state}]
   (let [result (insta/parse grammar body)]
     (if (insta/failure? result)
@@ -279,6 +282,7 @@
 (defn process
   [start-state]
   (and-then-> start-state
+    (cleanse)
     (parse)
     (determine-effects)
     (answer-queries)

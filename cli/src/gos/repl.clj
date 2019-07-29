@@ -76,7 +76,7 @@
   ([s buf]
    (let [c (.read s)]
      (if (= -1 c)
-       :quit
+       ":quit"
        (let [buf (str buf (char c))]
          (if (= (int \;) c)
            buf
@@ -87,7 +87,7 @@
   []
   (try
     (let [input (read-statement *in*)]
-      (when-not (= :quit input)
+      (when-not (= ":quit" input)
         (skip-if-eol *in*))
       input)
     (catch Exception e (throw (read-error e)))))
@@ -99,10 +99,10 @@
     (catch Throwable t (throw (eval-error t)))))
 
 (defn- repl-print
-  [state value]
+  [state]
   (try
     (when (:print state)
-      (-> value datafy sprint/print))
+      (sprint/print (datafy state)))
     (catch Exception e (throw (print-error e)))))
 
 (defn- repl-caught
@@ -122,6 +122,27 @@
 (defn- continue [state] (dissoc state :quit!))
 (defn- print [state b] (assoc state :print b))
 
+(defn- repl-control-command? [input]
+  (str/starts-with? input ":"))
+
+(defn- extract-control-command [input]
+  (-> input
+    (str/replace #"[;:\n]" "")
+    str/trim))
+
+(defmulti apply-control-command (fn [state input] (keyword (extract-control-command input))))
+(defmethod apply-control-command :quit
+  [state _]
+  (quit! state))
+
+(defmethod apply-control-command :print
+  [state _]
+  (print state true))
+
+(defmethod apply-control-command :noprint
+  [state _]
+  (print state false))
+
 ;; during init, we break on any error and do not continue reading
 (defn- repl-run-init
   [stream state]
@@ -129,11 +150,11 @@
         read-eval-print (fn [state]
                           (try
                             (let [input (repl-read)]
-                              (if (= :quit input)
-                                (quit! state)
-                                (let [value (repl-eval state input)]
-                                  (repl-print state value)
-                                  value)))
+                              (if (repl-control-command? input)
+                                (apply-control-command state input)
+                                (let [next-state (repl-eval state input)]
+                                  (repl-print next-state)
+                                  next-state)))
                             (catch Throwable e
                               (repl-caught e)
                               (quit! state))))]
@@ -149,15 +170,18 @@
   (let [read-eval-print (fn [state]
                           (try
                             (let [input (repl-read)]
-                              (if (= :quit input)
-                                (quit! state)
-                                (let [value (repl-eval state input)]
-                                  (repl-print state value)
-                                  value)))
+                              (if (repl-control-command? input)
+                                (apply-control-command state input)
+                                (let [next-state (repl-eval state input)]
+                                  (repl-print next-state)
+                                  next-state)))
                             (catch Throwable e
-                              (repl-caught e))))
+                              (repl-caught e)
+                              state)))
         state           (try (init state)
-                             (catch Throwable e (repl-caught e)))]
+                             (catch Throwable e
+                               (repl-caught e)
+                               state))]
     (when-not (:quit-after-init? state)
       (repl-prompt)
       (loop [state (print (continue state) true)]
