@@ -24,10 +24,13 @@ jobs:
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
 
-      - run:
-          command: !
-            cd cli;
-            clojure -A:uberjar
+      - run: cd ..; git clone git@github.com:mtnygard/vase
+      - run: cd ..; git clone git@github.com:clojure/spec-alpha2
+      - run: cd ..; git clone git@github.com:mtnygard/frenpl
+      - run: cd ..; git clone git@github.com:cognitect-labs/test-runner
+      - run: cd ..; git clone git@github.com:mdiin/cambada
+
+      - run: cd cli; clojure -A:uberjar
 
       - save_cache:
           paths:
@@ -35,7 +38,4 @@ jobs:
           key: v1-dependencies-{{ checksum "cli/deps.edn" }}
 
       # run tests!
-      - run:
-          command: !
-            cd api;
-            clojure -A:test
+      - run: cd api; clojure -A:test
