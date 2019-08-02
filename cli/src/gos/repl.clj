@@ -227,7 +227,8 @@
           fields  (mapv name (-> result :query-fields))
           fields  (if (empty? fields)
                     (let [field-count (reduce max 0 (map count matched))]
-                      (map str (range field-count))))]
+                      (map str (range field-count)))
+                    fields)]
       (print-table (map #(zipmap fields %) matched)))))
 
 (defn usage [options-summary]

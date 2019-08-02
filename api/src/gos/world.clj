@@ -240,7 +240,8 @@
 ;; Processing a request
 
 (defn initial-state [dbadapter]
-  {:dbadapter dbadapter})
+  {:dbadapter dbadapter
+   :print     true})
 
 (defn with-input [state input]
   (assoc state :body input))
