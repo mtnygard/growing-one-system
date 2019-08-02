@@ -1,7 +1,7 @@
 (ns gos.world
   (:require [clojure.string :as str]
             [gos.db :as db]
-            [gos.problems :refer [and-then-> with-problems]]
+            [gos.problems :refer [and-then-> with-problems with-exception]]
             [gos.responses :as responses :refer [bad-request ok]]
             [gos.seq :refer [conjv sequential-tree]]
             [instaparse.core :as insta]
@@ -258,27 +258,32 @@
       (with-problems state (insta/get-failure result))
       (assoc state :parsed (transform result)))))
 
-;; todo - generalize to more than just DB transactions
+(defmacro catching [& body]
+  `(try
+     ~@body
+     (catch Throwable t#
+       (with-exception ~'state t#))))
+
 (defn determine-effects [state]
-  (try
-    (reduce ->effect state (:parsed state))
-    (catch Throwable e
-      (with-problems state e))))
+  (catching
+    (reduce ->effect state (:parsed state))))
 
 (defn answer-queries [{:keys [dbadapter query] :as state}]
-  (if (some? query)
-    (merge state (query-relations dbadapter query))
-    state))
+  (catching
+    (if (some? query)
+      (merge state (query-relations dbadapter query))
+      state)))
 
 ;; todo - consider: can re-frame be used on server side?
 (defn apply-transactions [{:keys [tx-data] :as state}]
-  (cond-> state
-    (some? tx-data)
-    (assoc :tx-result (mapv #(update
-                               (deref (db/transact (:dbadapter state) %))
-                               :tx-data
-                               seq)
-                        tx-data))))
+  (catching
+    (cond-> state
+      (some? tx-data)
+      (assoc :tx-result (mapv #(update
+                                 (deref (db/transact (:dbadapter state) %))
+                                 :tx-data
+                                 seq)
+                          tx-data)))))
 
 (defn response [state]
   (assoc state :response (ok (select-keys state [:problems :tx-result :query-result :query-fields]))))

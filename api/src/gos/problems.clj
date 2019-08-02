@@ -1,4 +1,5 @@
-(ns gos.problems)
+(ns gos.problems
+  (:require [clojure.datafy :refer [datafy]]))
 
 (defmacro and-then->
   "When (:problems expr) is falsey, threads expr into the first form (via ->),
@@ -23,12 +24,15 @@
   [ctx & problems]
   (update ctx :problems intov problems))
 
+(defn with-exception
+  [ctx e]
+  (with-problems ctx (datafy e)))
+
 (defn or-else
   [ctx test problem]
   (if (test ctx)
     ctx
     (with-problems ctx problem)))
 
-(def problems? 
+(def problems?
   (comp not empty? :problems))
-  

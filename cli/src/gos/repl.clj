@@ -197,8 +197,9 @@
 
 (sprint/use ::error
   (fn [ex]
-    (print (:cause ex))
-    (print "\nException stack")
+    (println "An error was thrown:\n")
+    (println (:cause ex))
+    (println "\nException stack")
     (print-table (map #(-> %
                          (update :message join-lines)
                          (dissoc :at))
@@ -206,8 +207,15 @@
 
 (s/def ::tx-data (s/coll-of #(instance? datomic.db.Datum %)))
 (s/def ::ok-response (s/schema [::tx-result ::query-result]))
+(s/def ::problems (s/schema [::problems]))
 (s/def ::tx-response (s/select ::ok-response [:tx-result {:tx-result (s/coll-of (s/select ::tx-data [::tx-data]))}]))
 (s/def ::q-response (s/select ::ok-response [:query-result {:query-result set?}]))
+(s/def ::problems-response (s/select ::problems [:problems {:problems (s/coll-of ::error)}]))
+
+(sprint/use ::problems-response
+  (fn [result]
+    (doseq [p (:problems result)]
+      (sprint/print (datafy p)))))
 
 (defn- eavta?     [d] (mapv #(nth d %) [0 1 2 3 4]))
 (defn- datom->map [d] (zipmap [:e :a :v :tx :added?] (eavta? d)))

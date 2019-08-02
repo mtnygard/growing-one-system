@@ -130,6 +130,7 @@
   (let [f          (if (coll? from) (first from) from)
         constraint (when (coll? from) (rest from))
         original   (->map (e dbadapter f))]
+    (assert (attribute-exists? dbadapter f) (str "Attribute " f  " not found"))
     (merge (dissoc original :db/id)
       {:db/ident          to
        :attribute/derives f}
