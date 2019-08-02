@@ -75,18 +75,15 @@
 
 ;; this form will be used when a query is parsed from text.
 (defn query-relations [dbadapter xs]
-  (run-query
-    dbadapter
-    (reduce
-      merge-query
-      empty-query
-      (map #(build-datalog dbadapter %) xs))))
+  (let [query (reduce merge-query empty-query (map #(build-datalog dbadapter %) xs))]
+    {:query-result (run-query dbadapter query)
+     :query-fields (:find query)}))
 
 (def query-helper-fn
   (memoize
     (fn [dbadapter relnm]
       (fn [pattern]
-        (query-relations dbadapter [[::relation relnm pattern]])))))
+        (:query-result (query-relations dbadapter [[::relation relnm pattern]]))))))
 
 ;; Sanity checks
 (defn assert-has-attributes [nm attrs]
@@ -262,9 +259,9 @@
   (reduce ->effect state (:parsed state)))
 
 (defn answer-queries [{:keys [dbadapter query] :as state}]
-  (cond-> state
-    (some? query)
-    (assoc :query-result (query-relations dbadapter query))))
+  (if (some? query)
+    (merge state (query-relations dbadapter query))
+    state))
 
 ;; todo - consider: can re-frame be used on server side?
 (defn apply-transactions [{:keys [tx-data] :as state}]
@@ -277,7 +274,7 @@
                         tx-data))))
 
 (defn response [state]
-  (assoc state :response (ok (select-keys state [:problems :tx-result :query-result]))))
+  (assoc state :response (ok (select-keys state [:problems :tx-result :query-result :query-fields]))))
 
 (defn process
   [start-state]

@@ -276,6 +276,47 @@
         (is (ok? result))
         (is (= #{["cake"]} (-> result :response :body :query-result)))))))
 
+(deftest query-fields
+  (testing "fields are named for the logic variables"
+    (after ["attr name string one;"
+            "relation location name;"
+            "location \"NYC\";"
+            "location \"anywhere else\";"]
+      (let [result (world/process (world/with-input (start-state) "location ?name;"))]
+        (is (ok? result))
+        (is (= '[?name] (-> result :response :body :query-fields))))
+      (let [result (world/process (world/with-input (start-state) "location ?cake;"))]
+        (is (ok? result))
+        (is (= '[?cake] (-> result :response :body :query-fields)))))
+
+    (after ["attr name string one;"
+            "relation seats name name name name;"
+            "seats \"a\" \"b\" \"c\" \"d\";"]
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "seats ?a ?b ?c ?d;"))]
+        (is (ok? result))
+        (is (= '[?a ?b ?c ?d] (-> result :response :body :query-fields)))))
+
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age \"douglas\" 25;"
+            "person-age \"sarai\"   39;"
+            "person-age \"rajesh\"  25;"
+            "relation person-title name name;"
+            "person-title \"douglas\" \"associate\";"
+            "person-title \"sarai\"   \"staff\";"
+            "person-title \"joan\"    \"host\";"]
+      (let [result (world/process (world/with-input
+                                    (start-state)
+                                    "person-age ?name ?age, person-title ?name ?title;"))]
+        (is (ok? result))
+        (is (= #{["douglas" 25 "associate"]
+                 ["sarai"   39 "staff"]}
+              (-> result :response :body :query-result)))
+        (is (= '[?name ?age ?title] (-> result :response :body :query-fields)))))))
+
 (deftest fields-are-ordered-not-named
   (testing "an instance's fields are kept separate"
     (after ["attr name string one;"

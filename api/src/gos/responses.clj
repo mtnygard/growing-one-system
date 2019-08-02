@@ -3,8 +3,8 @@
 (defn response
   ([status body]
    {:status  status
-       :headers {}
-       :body    body}))
+    :headers {}
+    :body    body}))
 
 (defmacro http-status [code sym]
   `(def ~sym (partial response ~code)))
