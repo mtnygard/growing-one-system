@@ -26,7 +26,7 @@ jobs:
 
       - run:
           command: !
-            cd cli
+            cd cli;
             clojure -A:uberjar
 
       - save_cache:
@@ -37,5 +37,5 @@ jobs:
       # run tests!
       - run:
           command: !
-            cd api
+            cd api;
             clojure -A:test
