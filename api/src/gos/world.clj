@@ -247,7 +247,7 @@
   (assoc state :body input))
 
 (defn cleanse [state]
-  (dissoc state :response :tx-data :parsed :tx-result :query-result :problems :query))
+  (dissoc state :response :tx-data :parsed :tx-result :query-result :problems :query :query-fields))
 
 (defn parse [{:keys [body] :as state}]
   (let [result (insta/parse grammar body)]
@@ -279,8 +279,7 @@
 
 (defn process
   [start-state]
-  (and-then-> start-state
-    (cleanse)
+  (and-then-> (cleanse start-state)
     (parse)
     (determine-effects)
     (answer-queries)
