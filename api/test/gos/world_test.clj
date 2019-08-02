@@ -359,3 +359,22 @@
                                     "diagram-kind ?kind ?tag ?label;"))]
         (is (= 4 (count
                    (-> result :response :body :query-result))))))))
+
+(deftest relations-can-constrain-values
+  (testing "values in the confining relation are accepted"
+    (after ["attr name string one;"
+            "relation direction name;"
+            "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"
+            "relation arrow (name in direction);"]
+      (let [result (world/process (world/with-input (start-state)
+                                    "arrow \"N\";"))]
+        (is (ok? result)))))
+
+  (testing "values not in the confining relation are rejected"
+    (after ["attr name string one;"
+            "relation direction name;"
+            "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"
+            "relation arrow (name in direction);"]
+      (let [result (world/process (world/with-input (start-state)
+                                    "arrow \"to the knee\";"))]
+        (is (not (ok? result)))))))

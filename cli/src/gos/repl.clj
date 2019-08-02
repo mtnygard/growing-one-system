@@ -249,8 +249,6 @@
   (println msg)
   (System/exit status))
 
-(def datomic-memory-uri "datomic:mem://repl")
-
 (def ^:private mutually-exclusive "Only one of --on-disk or --in-memory can be used.")
 
 (defn validate-args
@@ -301,6 +299,8 @@
 (comment
 
   ;; to use gos REPL from Clojure REPL
+  (def datomic-memory-uri "datomic:mem://repl")
+
   (def dbadapter (db/classic datomic-memory-uri))
   (defn p [s]
     (repl-print

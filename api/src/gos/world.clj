@@ -193,25 +193,26 @@
 
 (def ^:private grammar
   (insta/parser
-   "<input> = ((attribute / relation / statements) <';'>)*
-    attribute = <'attr'> name type cardinality
-    relation = 'relation' name name+
-    statements = statement ( <','> statement )*
-    statement = (name / operator) repeat? value ( repeat? value)*
-    repeat = <':'>
-    name = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
-    type = #\"[a-zA-Z_][a-zA-Z0-9]*\"
-    value = symbol | string-literal | long-literal | boolean-literal | date-literal
-    symbol = #\"[a-zA_Z_0-9\\?][a-zA_Z_0-9\\?\\-\\$%*]*\"
-    string-literal = #\"\\\"(\\.|[^\\\"])*\\\"\"
-    long-literal = #\"-?[0-9]+\"
-    date-literal = #\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"
-    boolean-literal = 'true' | 'false'
-    cardinality = 'one' | 'many'
-    operator = '=' | '!=' | '<' | '<=' | '>' | '>='"
+   "<input>          = ((attribute / relation / statements) <';'>)*
+    attribute        = <'attr'> name type cardinality
+    relation         = 'relation' name attrref+
+    statements       = statement ( <','> statement )*
+    statement        = (name / operator) repeat? value ( repeat? value)*
+    repeat           = <':'>
+    <attrref>        = name | constrained-name
+    constrained-name = <'('> name constraint <')'>
+    constraint       = 'in' name
+    name             = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
+    type             = #\"[a-zA-Z_][a-zA-Z0-9]*\"
+    value            = symbol | string-literal | long-literal | boolean-literal | date-literal
+    symbol           = #\"[a-zA_Z_0-9\\?][a-zA_Z_0-9\\?\\-\\$%*]*\"
+    string-literal   = #\"\\\"(\\.|[^\\\"])*\\\"\"
+    long-literal     = #\"-?[0-9]+\"
+    date-literal     = #\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"
+    boolean-literal  = 'true' | 'false'
+    cardinality      = 'one' | 'many'
+    operator         = '=' | '!=' | '<' | '<=' | '>' | '>='"
    :auto-whitespace whitespace-or-comments))
-
-
 
 (defn- statements [& vs]
   (if (has-lvars? vs)
@@ -220,21 +221,23 @@
 
 (defn- transform [parse-tree]
   (insta/transform
-    {:attribute       (fn [n t c] [:attribute n t c])
-     :name            keyword
-     :type            keyword
-     :cardinality     keyword
-     :value           identity
-     :symbol          symbol
-     :string-literal  edn/read-string
-     :long-literal    edn/read-string
-     :boolean-literal edn/read-string
-     :date-literal    date/yyyy-mm-dd
-     :statement       vector
-     :statements      statements
-     :repeat          (constantly :repeat)
-     :relation        (fn [_ r & xs] [:relation r xs])
-     :operator        (fn [x] [::operator (symbol x)])}
+    {:attribute        (fn [n t c] [:attribute n t c])
+     :name             keyword
+     :type             keyword
+     :cardinality      keyword
+     :value            identity
+     :symbol           symbol
+     :constraint       (fn [x & more] (list* (keyword x) more))
+     :constrained-name vector
+     :string-literal   edn/read-string
+     :long-literal     edn/read-string
+     :boolean-literal  edn/read-string
+     :date-literal     date/yyyy-mm-dd
+     :statement        vector
+     :statements       statements
+     :repeat           (constantly :repeat)
+     :relation         (fn [_ r & xs] [:relation r xs])
+     :operator         (fn [x] [::operator (symbol x)])}
    parse-tree))
 
 ;; Processing a request
@@ -257,7 +260,10 @@
 
 ;; todo - generalize to more than just DB transactions
 (defn determine-effects [state]
-  (reduce ->effect state (:parsed state)))
+  (try
+    (reduce ->effect state (:parsed state))
+    (catch Throwable e
+      (with-problems state e))))
 
 (defn answer-queries [{:keys [dbadapter query] :as state}]
   (if (some? query)

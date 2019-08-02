@@ -25,7 +25,11 @@
    {:db/ident       :attribute/derives
     :db/valueType   :db.type/ref
     :db/cardinality :db.cardinality/one
-    :db/doc         "Attribute types are copied on use. This points back to the original."}])
+    :db/doc         "Attribute types are copied on use. This points back to the original."}
+   {:db/ident       :attribute/in
+    :db/valueType   :db.type/ref
+    :db/cardinality :db.cardinality/one
+    :db/doc         "If present, means the values of an attribute must be in the referenced relation"}])
 
 ;; Paper over API differences between cloud and on-prem
 
@@ -116,12 +120,21 @@
           nil
           (Integer/parseInt n))))))
 
+(defmulti derive-constraint (fn [_ [[op & _]]] op))
+(defmethod derive-constraint :in
+  [dbadapter [[_ target-relation]]]
+  {:attribute/in target-relation})
+
 (defn- derive-type
   [dbadapter from to]
-  (let [original (->map (e dbadapter from))]
+  (let [f          (if (coll? from) (first from) from)
+        constraint (when (coll? from) (rest from))
+        original   (->map (e dbadapter f))]
     (merge (dissoc original :db/id)
       {:db/ident          to
-       :attribute/derives from})))
+       :attribute/derives f}
+      (when constraint
+        (derive-constraint dbadapter constraint)))))
 
 (defn- derived-types
   "Make copies of the attributes used in this relation."
@@ -143,7 +156,7 @@
     [(define-attribute nm ty card)]))
 
 (defn mkrel [dbadapter nm type-nms]
-  {:pre [(keyword? nm) (every? keyword? type-nms) (< 0 (count type-nms))]}
+  {:pre [(keyword? nm) (< 0 (count type-nms))]}
   [(derived-types dbadapter nm type-nms)
    [(relation-entity nm type-nms)]])
 
@@ -152,9 +165,25 @@
         attrs (sort-by kw->ordinal (:relation/attributes r))]
     (assoc r :relation/ordered-attributes attrs)))
 
+(defn- member-of-unary-relation?
+  [dbadapter reln val]
+  (let [unary-attr (first (attr-names reln))]
+    (not
+      (empty?
+        (q dbadapter
+          '[:find ?e :in $ ?r ?a ?v :where [?e :entity/relation ?r] [?e ?a ?v]]
+          [reln unary-attr val])))))
+
+(defn- unify-attr [dbadapter attr-nm val]
+  (let [a (e dbadapter attr-nm)]
+    (assert (some? a) "Attribute not found")
+    (when-let [in (:attribute/in a)]
+      (assert (member-of-unary-relation? dbadapter in val)))
+    [(:db/ident a) val]))
+
 (defn mkent [dbadapter nm attrs vals]
   {:pre [(keyword? nm)]}
-  (assoc (zipmap attrs vals)
+  (assoc (into {} (map #(unify-attr dbadapter %1 %2) attrs vals))
     :entity/relation nm))
 
 (defn attr-type [dbadapter attr-nm]
