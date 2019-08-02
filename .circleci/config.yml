@@ -26,9 +26,9 @@ jobs:
 
       - run: cd ..; git clone git@github.com:mtnygard/vase
       - run: cd ..; git clone git@github.com:clojure/spec-alpha2
-      - run: cd ..; git clone git@gitlab.com:mtnygard/frenpl
       - run: cd ..; git clone git@github.com:cognitect-labs/test-runner
       - run: cd ..; git clone git@github.com:mdiin/cambada
+      - run: cd ..; git clone https://gitlab.com/mtnygard/frenpl
 
       - run: cd cli; clojure -A:uberjar
 
