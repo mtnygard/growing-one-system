@@ -5,13 +5,14 @@
              com.cognitect/anomalies     {:mvn/version "0.1.12"}
              re-frame                    {:mvn/version "0.10.6"}
              instaparse                  {:mvn/version "1.4.10"}}
- :aliases   {:dev     {:main-opts   ["-m" "frenpl"]
-                       :extra-paths ["dev" "test"]
-                       :extra-deps  {frenpl {:local/root "../../frenpl"}}}
-             :test    {:extra-paths ["test"]
-                       :extra-deps  {com.cognitect/test-runner {:local/root "../../test-runner"}}
-                       :main-opts   ["-m" "cognitect.test-runner"]}
-             :run     {:main-opts ["-m" "gos.main" "src/config.fern"]
-                       :jvm-opts  ["--add-modules" "java.xml.bind"]}}
- :mvn/repos {"central" {:url "http://repo1.maven.org/maven2/"}
-             "clojars" {:url "https://repo.clojars.org/"}}}
+ :aliases   {:dev  {:main-opts   ["-m" "frenpl"]
+                    :extra-paths ["dev" "test"]
+                    :extra-deps  {frenpl {:local/root "../../frenpl"}}}
+             :test {:extra-paths ["test"]
+                    :extra-deps  {com.cognitect/test-runner {:local/root "../../test-runner"}}
+                    :main-opts   ["-m" "cognitect.test-runner"]}
+             :run  {:main-opts ["-m" "gos.main" "src/config.fern"]
+                    :jvm-opts  ["--add-modules" "java.xml.bind"]}}
+ :mvn/repos {"central"        {:url "http://repo1.maven.org/maven2/"}
+             "clojars"        {:url "https://repo.clojars.org/"}
+             "my.datomic.com" {:url "https://my.datomic.com/repo"}}}
