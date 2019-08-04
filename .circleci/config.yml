@@ -31,7 +31,7 @@ jobs:
       - run: cd ..; git clone git@github.com:mdiin/cambada
       - run: cd ..; git clone https://gitlab.com/mtnygard/frenpl
       - run: cat ~/.m2/settings.xml
-      - run: cd cli; clojure -Srepro -A:uberjar
+      - run: echo $DATOMIC_REPO_USERNAME; cd cli; clojure -A:uberjar
 
       - save_cache:
           paths:
