@@ -24,14 +24,13 @@ jobs:
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
 
-      - run: mkdir -p ~/.m2/ && ln -sf `pwd`/.circleci/mvnsettings.xml ~/.m2/settings.xml
+      - run: mkdir -p ~/.m2/ && cp .circleci/mvnsettings.xml ~/.m2/settings.xml
       - run: cd ..; git clone git@github.com:mtnygard/vase
       - run: cd ..; git clone git@github.com:clojure/spec-alpha2
       - run: cd ..; git clone git@github.com:cognitect-labs/test-runner
       - run: cd ..; git clone git@github.com:mdiin/cambada
       - run: cd ..; git clone https://gitlab.com/mtnygard/frenpl
-      - run: cat ~/.m2/settings.xml
-      - run: echo $DATOMIC_REPO_PASSWORD; cd cli; clojure -A:uberjar
+      - run: cd cli; clojure -A:uberjar
 
       - save_cache:
           paths:
