@@ -30,8 +30,8 @@ jobs:
       - run: cd ..; git clone git@github.com:cognitect-labs/test-runner
       - run: cd ..; git clone git@github.com:mdiin/cambada
       - run: cd ..; git clone https://gitlab.com/mtnygard/frenpl
-
-      - run: cd cli; clojure -A:uberjar
+      - run: cat ~/.m2/settings.xml
+      - run: cd cli; clojure -Srepro -A:uberjar
 
       - save_cache:
           paths:
