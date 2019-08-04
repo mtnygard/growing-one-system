@@ -13,5 +13,6 @@
              :repl    {:main-opts ["-m" "gos.repl"]}
              :uberjar {:extra-deps {mdiin/cambada {:local/root "../../cambada"}}
                        :main-opts  ["-m" "cambada.uberjar" "-m" "gos.repl" "--app-version" "1.0.1"]}}
- :mvn/repos {"central" {:url "https://repo1.maven.org/maven2/"}
-             "clojars" {:url "https://repo.clojars.org/"}}}
+ :mvn/repos {"central"        {:url "https://repo1.maven.org/maven2/"}
+             "clojars"        {:url "https://repo.clojars.org/"}
+             "my.datomic.com" {:url "https://my.datomic.com/repo"}}}
