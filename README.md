@@ -231,6 +231,105 @@ colored-shape "Green" "Triangle";
 That's just making a new fact. Later, we'll see how you would make an
 existence query.
 
+## Constraints
+
+If you've been trying these statements at a REPL, you might have
+experimented a bit and realized that you can put pretty much any
+string in a name. That's what the attribute declaration says, it's
+just a string.
+
+But what if you want the colors in `colored-shape` to come from a
+limited set of enumerated values? That requires a constraint.
+
+Constraints are not placed on the attributes, but on their uses in a
+relation. We could put in a series of definitions like this:
+
+```
+attr name string one;
+
+relation colors name;
+relation shapes name;
+relation colored-shape2 (name in colors) (name in shapes);
+```
+
+Notice that here, instead of saying that `color` is an attribute with
+a string value, we're saying there's a unary relation called
+`colors`. Then `colored-shape2` is constrained so that the only
+allowed values for its first position are those values found in the
+`colors` relation. Likewise for shapes.
+
+If you try to add a fact that breaks these constraints, you will get
+an error and the fact will be rejected.
+
+At the moment, `in` is the only constraint we support. It only works
+when checking one value against the first position in some other
+relation.
+
+### When to Constrain
+
+Don't always assume that a constraint is the answer to your modeling
+problem. Remember the purpose of a constraint is to _exclude_ facts
+from your understanding of the world. Sometimes it's better to accept
+a fact that is stated, even if it makes no sense at the time. For
+instances, if someone tells you a shape is "mauve", and your set of
+colors doesn't include `mauve`, that doesn't change the reality of the
+shape, just your ability to represent it.
+
+Often, it is better to apply restrictions at the time of a query
+instead of when accepting facts. Then you can write queries to find
+out the facts that are contradictory or nonsensical... because finding
+out there are conflicts in your knowledge base is really important!
+
+## Shorthand for Repeated Facts
+
+When you have a series of declarations, it can be tedious to repeat
+the relation name over and over. We have a shorthand notation that
+uses a colon (":") to mean "hold the left side constant."
+
+For example, we can restate the colors from before like this:
+
+```
+colors: "Red" "Green" "Blue";
+colors: "Mauve";
+```
+
+That is exactly as if you had supplied:
+
+```
+colors "Red";
+colors "Green";
+colors "Blue";
+colors "Mauve";
+```
+
+The colon shorthand can do more than just repeat the relation
+name. Suppose you have a relation with 2 positions:
+
+```
+colored-shape "Red": "Triangle" "Circle" "Square";
+```
+
+This will add three facts about red shapes.
+
+Since the colon means "hold the left side constant", you can use it
+when there are more than one "missing" values on the right:
+
+```
+colored-shape:
+  "Red"    "Triangle"
+  "Green"  "Circle"
+  "Blue"   "Square"
+  "Mauve"  "Pentagon"
+  ;
+```
+
+This makes a nice looking notation that resembles a table
+declaration.
+
+Of course, you have to supply enough values to completely fill the
+facts. If there are any leftovers, the interpreter will throw an
+error.
+
 ## Joining Relations
 
 Let's make another few relations:
@@ -313,9 +412,7 @@ clauses: `<`, `<=`, `!=`, `>`, and `>=`. Equal and not-equal work on
 any type. Less than, greater than, and their kin work only on numbers:
 long or double.
 
-(A future release will extend these to work on instants as well. A
-future release will also bring set operators like "in", "not-in",
-"union", "difference", and "intersection".)
+(A future release will extend these to work on instants as well.)
 
 What happens if you try to join relations that don't have matching
 facts?
@@ -358,3 +455,19 @@ animal ?name, animal-body ?name ?large true;
 
 Oh, as you can see in this query, clauses don't have to start on new
 lines. It's just easier to read that way most of the time.
+
+# Controlling the REPL
+
+There are a small handful of "commands" that change the behavior of
+the REPL itself. These are not processed as facts or queries:
+
+| `:quit`    | Exit the REPL            |
+| `:noprint` | Turn output printing off |
+| `:print`   | Turn output back on      |
+
+`:noprint` is helpful when you have a lot of declarations to process
+and you don't want tabular noise streaming down your screen like The
+Matrix.
+
+Files that you supply with `-e` are processed with `:noprint`. You can
+embed `:print` in the files to turn output on.
