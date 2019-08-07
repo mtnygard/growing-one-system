@@ -10,6 +10,9 @@
 (defn- p [body]
   (world/parse {:body body}))
 
+(defn- first-token [body]
+  (ffirst (:parsed (p body))))
+
 (deftest parse-inputs
   (testing "Empty input is accepted"
     (is (not (problems? (p "")))))
@@ -23,24 +26,17 @@
   (testing "string literal"
     (is (not (problems? (p "x \"this is a string\";")))))
 
-  (testing "Defining an attribute"
-    (is (not (problems? (p "attr name string one;"))))
-    (is (= :attribute (ffirst (:parsed (p "attr aliases string many;"))))))
-
-  (testing "Defining a relation"
-    (is (not (problems? (p "relation name repo;"))))
-    (is (= :relation (ffirst (:parsed (p "relation name repo;"))))))
+  (testing "several declaration forms"
+    (are [token s] (and (not (problems? (p s))) (= token (first-token s)))
+      :attribute   "attr name string one;"
+      :relation    "relation name repo;"
+      :instances   "code \"growing-one-system\" \"https://github.com/mtnygard/growing-one-system\";"
+      :query       "person ?n;"
+      :let-expr    "{ person => person ?name; };"
+      ))
 
   (testing "Multiple statements"
-    (is (not (problems? (p "attr name string one; attr repo url many; relation code-location name repo;")))))
-
-  (testing "Making an element of a relation"
-    (is (not (problems? (p "code \"growing-one-system\" \"https://github.com/mtnygard/growing-one-system\";"))))
-    (is (= :instances (ffirst (:parsed (p "code \"growing-one-system-book\" \"https://github.com/mtnygard/growing-one-system-book\";"))))))
-
-  (testing "Queries have logic variables"
-    (is (not (problems? (p "person ?n;"))))
-    (is (= :query (ffirst (:parsed (p "person ?n;")))))))
+    (is (not (problems? (p "attr name string one; attr repo url many; relation code-location name repo;"))))))
 
 (defn- process
   [state]
@@ -378,3 +374,59 @@
       (let [result (world/process (world/with-input (start-state)
                                     "arrow \"to the knee\";"))]
         (is (not (ok? result)))))))
+
+#_(deftest let-expressions
+  (testing "return maps in their results"
+    (let [result (world/process (world/with-input (start-state)
+                                  "{ };"))]
+      (is (ok? result))
+      (is (= {} (-> result :response :body))))
+    )
+
+  (testing "allow constant values"
+    (let [result (world/process (world/with-input (start-state)
+                                  "{ a => b };"))]
+      (is (ok? result))
+      (is (= {'a 'b} (-> result :response :body)))))
+
+  (testing "allow queries as the right hand side"
+    (after ["attr name string one;"
+            "relation direction name;"
+            "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
+
+      (let [result (world/process (world/with-input (start-state)
+                                    "{ dir => direction ?d; };"))]
+        (is (ok? result))
+        (is (= {'dir #{["N"] ["NE"] ["E"] ["SE"] ["S"] ["SW"] ["W"] "NW"}})))))
+
+  (testing "allow multiple bindings"
+    (after ["attr name string one;"
+            "relation person name;"
+            "person: \"rajesh\" \"sarai\" \"douglas\";"
+            "relation direction name;"
+            "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
+
+      (let [result (world/process (world/with-input (start-state)
+                                    "{ dir => direction ?d;
+                                       person => person ?name; };"))]
+        (is (ok? result))
+        (is (= {'dir #{["N"] ["NE"] ["E"] ["SE"] ["S"] ["SW"] ["W"] ["NW"]}
+                'person #{["rajesh"] ["sarai"] ["douglas"]}})))))
+
+  (testing "allow multiple clauses on the right hand side"
+    (after ["attr name string one;"
+            "attr age long one;"
+            "relation person-age name age;"
+            "person-age \"douglas\" 25;"
+            "person-age \"sarai\"   39;"
+            "person-age \"rajesh\"  25;"
+            "relation direction name;"
+            "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
+
+      (let [result (world/process (world/with-input (start-state)
+                                    "{ dir => direction ?d;
+                                       person => person-age ?name ?age,
+                                                 = ?age 39; };"))]
+        (is (ok? result))
+        (is (= {'dir #{["N"] ["NE"] ["E"] ["SE"] ["S"] ["SW"] ["W"] ["NW"]}
+                'person #{["sarai"]}}))))))

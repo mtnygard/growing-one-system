@@ -1,13 +1,14 @@
 (ns gos.world
-  (:require [clojure.string :as str]
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
+            [gos.date :as date]
             [gos.db :as db]
-            [gos.problems :refer [and-then-> with-problems with-exception]]
+            [gos.map :refer [map-vals]]
+            [gos.problems :refer [and-then-> with-exception with-problems]]
             [gos.responses :as responses :refer [bad-request ok]]
             [gos.seq :refer [conjv sequential-tree]]
             [instaparse.core :as insta]
-            [io.pedestal.interceptor :as i]
-            [clojure.edn :as edn]
-            [gos.date :as date]))
+            [io.pedestal.interceptor :as i]))
 
 (defn relation [dbadapter nm] (db/rel dbadapter nm))
 (def  relation-attributes :relation/ordered-attributes)
@@ -177,6 +178,12 @@
 (defmethod ->effect :query [state [_ clauses]]
   (assoc state :query (mapv #(query-clause state %) clauses)))
 
+(defmethod ->effect :let-expr [state [_ bindings]]
+  (assoc state :binding (map-vals #(->effect state %) bindings)))
+
+;; todo - time to make a real AST...
+
+
 ;; Parsing inputs
 
 (def ^:private whitespace
@@ -193,11 +200,13 @@
 
 (def ^:private grammar
   (insta/parser
-   "<input>          = ((attribute / relation / statements) <';'>)*
+   "<input>          = ((attribute / relation / let-expr / statements) <';'>)*
     attribute        = <'attr'> name type cardinality
     relation         = 'relation' name attrref+
-    statements       = statement ( <','> statement )*
-    statement        = (name / operator) repeat? value ( repeat? value)*
+    let-expr         = <'{'> binding* <'}'>
+    binding          = name <'=>'> statements <';'>
+    statements       = ( statement ( <','> statement )* )
+    statement        = (name / operator) repeat? value ( repeat? value )*
     repeat           = <':'>
     <attrref>        = name | constrained-name
     constrained-name = <'('> name constraint <')'>
@@ -233,6 +242,7 @@
      :long-literal     edn/read-string
      :boolean-literal  edn/read-string
      :date-literal     date/yyyy-mm-dd
+     :binding          (fn [& xs] (apply hash-map xs))
      :statement        vector
      :statements       statements
      :repeat           (constantly :repeat)
