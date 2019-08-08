@@ -11,7 +11,7 @@
   (world/parse {:body body}))
 
 (defn- first-token [body]
-  (ffirst (:parsed (p body))))
+  (-> body p :parsed second second first))
 
 (deftest parse-inputs
   (testing "Empty input is accepted"
@@ -30,7 +30,7 @@
     (are [token s] (and (not (problems? (p s))) (= token (first-token s)))
       :attribute   "attr name string one;"
       :relation    "relation name repo;"
-      :instances   "code \"growing-one-system\" \"https://github.com/mtnygard/growing-one-system\";"
+      :instance    "code \"growing-one-system\" \"https://github.com/mtnygard/growing-one-system\";"
       :query       "person ?n;"
       :let-expr    "{ person => person ?name; };"
       ))

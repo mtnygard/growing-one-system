@@ -37,6 +37,10 @@
 (defn- in-clause [findvars pattern]
   (keep identity (mask #(lvar? %2) findvars pattern)))
 
+(defn- run-query
+  [dbadapter q]
+  (db/q dbadapter (dissoc q :args) (:args q)))
+
 (def empty-query
   {:find  []
    :in    ['$]
@@ -51,13 +55,92 @@
     (update :where concat (:where x))
     (update :args  concat (:args x))))
 
-(defn- run-query
-  [dbadapter q]
-  (db/q dbadapter (dissoc q :args) (:args q)))
+;; ========================================
+;; Abstract Syntax Tree
 
-(defmulti build-datalog (fn [_ [op & _]] op))
+(defprotocol AST
+  (problems [this state] "Return coll of problems with this AST node")
+  (evaluate [this state] "Return the AST node's value."))
 
-(defmethod build-datalog ::relation
+(defrecord Attribute [nm type card]
+  AST
+  (problems [this state]
+    ;; todo - check that the type exists, nm is a keyword
+    nil)
+  (evaluate [this state]
+    @(db/transact (:dbadapter state)
+       (db/mkattr (:dbadapter state) nm type card))))
+
+(defrecord Relation [nm attrs]
+  AST
+  (problems [this state]
+    ;; todo - check attrs exist
+    ;; todo - check any constraints are legit
+    nil
+    )
+  (evaluate [this state]
+    @(db/transact (:dbadapter state)
+       (db/mkrel (:dbadapter state) nm attr-nms))))
+
+(defrecord Instance [rel vals]
+  AST
+  (problems [this state]
+    ;; todo - check rel exists
+    ;; todo - check enough vals
+    nil)
+
+  (evaluate [this state]
+    (doseq [:let [rel   (relation (:dbadapter state) nm)
+                  attrs (relation-attributes rel)
+                  _     (assert-has-attributes nm attrs)]
+            vals (unpack-repeats (count attrs) vals)]
+      @(db/transact (:dbadapter state)
+         (db/mkent (:dbadapter state) nm attrs vals)))))
+
+(defrecord Query [clauses]
+  AST
+  (problems [this state]
+    nil)
+
+  (evaluate [this state]
+    (let [dbadapter (:dbadapter state)
+          query     (reduce merge-query empty-query (map #(evaluate % state) clauses))]
+      {:query-result (run-query dbadapter query)
+       :query-fields (:find query)})))
+
+(defrecord QueryRelation [relnm pattern]
+  AST
+  (problems [this state]
+    ;; (assert-has-attributes nm attrs)
+    ;; (assert-sufficient-pattern nm attrs pattern)
+    nil)
+
+  (evaluate [this state]
+    (let [rel   (relation dbadapter relnm)
+          attrs (relation-attributes rel)
+          ident (:db/ident rel)
+          lv    (lparms attrs pattern)
+          esym  (gensym "?e")
+          where (lclause esym attrs lv)]
+      {:find  (into [] (distinct lv))
+       :in    (in-clause lv pattern)
+       :where (into [[esym :entity/relation ident]] where)
+       :args  (remove lvar? pattern)})))
+
+(defrecord QueryOperator [pattern]
+  (problems [this state]
+    nil)
+
+  (evaluate [this state]
+    {:where [[(list* pat)]]}))
+
+
+
+
+
+#_(defmulti build-datalog (fn [_ [op & _]] op))
+
+#_(defmethod build-datalog ::relation
   [dbadapter [_ relnm pattern]]
   (let [rel   (relation dbadapter relnm)
         attrs (relation-attributes rel)
@@ -70,12 +153,12 @@
      :where (into [[esym :entity/relation ident]] where)
      :args  (remove lvar? pattern)}))
 
-(defmethod build-datalog ::operator
+#_(defmethod build-datalog ::operator
   [dbadapter [_ & pat]]
   {:where [[(list* pat)]]})
 
 ;; this form will be used when a query is parsed from text.
-(defn query-relations [dbadapter xs]
+#_(defn query-relations [dbadapter xs]
   (let [query (reduce merge-query empty-query (map #(build-datalog dbadapter %) xs))]
     {:query-result (run-query dbadapter query)
      :query-fields (:find query)}))
@@ -200,20 +283,29 @@
 
 (def ^:private grammar
   (insta/parser
-   "<input>          = ((attribute / relation / let-expr / statements) <';'>)*
-    attribute        = <'attr'> name type cardinality
-    relation         = 'relation' name attrref+
-    let-expr         = <'{'> binding* <'}'>
-    binding          = name <'=>'> statements <';'>
-    statements       = ( statement ( <','> statement )* )
-    statement        = (name / operator) repeat? value ( repeat? value )*
-    repeat           = <':'>
+   "input            = expr*
+    expr             = ( attribute-decl / relation-decl / let-expr / instance-expr / query-expr ) <';'>
+
+    attribute-decl   = <'attr'> name type cardinality
+
+    relation-decl    = 'relation' name attrref+
     <attrref>        = name | constrained-name
     constrained-name = <'('> name constraint <')'>
     constraint       = 'in' name
+
+    let-expr         = <'{'> ( name <'=>'> expr )* <'}'>
+
+    instance-expr    = name repeat? value ( repeat? value )*
+    value            = symbol | string-literal | long-literal | boolean-literal | date-literal
+
+    query-expr       = query-clause ( <','> query-clause )*
+    query-clause     = instance-clause | operator-clause
+    instance-clause  = name value*
+    operator-clause  = operator value*
+
+    repeat           = <':'>
     name             = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
     type             = #\"[a-zA-Z_][a-zA-Z0-9]*\"
-    value            = symbol | string-literal | long-literal | boolean-literal | date-literal
     symbol           = #\"[a-zA_Z_0-9\\?][a-zA_Z_0-9\\?\\-\\$%*]*\"
     string-literal   = #\"\\\"(\\.|[^\\\"])*\\\"\"
     long-literal     = #\"-?[0-9]+\"
@@ -223,14 +315,16 @@
     operator         = '=' | '!=' | '<' | '<=' | '>' | '>='"
    :auto-whitespace whitespace-or-comments))
 
-(defn- statements [& vs]
+(defn- instance-or-query [vs]
   (if (has-lvars? vs)
     [:query vs]
-    [:instances vs]))
+    [:instance vs]))
 
-(defn- transform [parse-tree]
+(defn transform [parse-tree]
   (insta/transform
-    {:attribute        (fn [n t c] [:attribute n t c])
+    {:attribute-decl   (fn [n t c] [:attribute n t c])
+     :relation-decl    (fn [_ r & xs] [:relation r xs])
+     :instance-expr    (fn [_ & xs] (instance-or-query xs))
      :name             keyword
      :type             keyword
      :cardinality      keyword
@@ -243,15 +337,11 @@
      :boolean-literal  edn/read-string
      :date-literal     date/yyyy-mm-dd
      :binding          (fn [& xs] (apply hash-map xs))
-     :statement        vector
-     :statements       statements
      :repeat           (constantly :repeat)
-     :relation         (fn [_ r & xs] [:relation r xs])
      :operator         (fn [x] [::operator (symbol x)])}
    parse-tree))
 
 ;; Processing a request
-
 (defn initial-state [dbadapter]
   {:dbadapter dbadapter
    :print     true})
@@ -274,18 +364,17 @@
      (catch Throwable t#
        (with-exception ~'state t#))))
 
-(defn determine-effects [state]
+#_(defn determine-effects [state]
   (catching
     (reduce ->effect state (:parsed state))))
 
-(defn answer-queries [{:keys [dbadapter query] :as state}]
+#_(defn answer-queries [{:keys [dbadapter query] :as state}]
   (catching
     (if (some? query)
       (merge state (query-relations dbadapter query))
       state)))
 
-;; todo - consider: can re-frame be used on server side?
-(defn apply-transactions [{:keys [tx-data] :as state}]
+#_(defn apply-transactions [{:keys [tx-data] :as state}]
   (catching
     (cond-> state
       (some? tx-data)
@@ -295,17 +384,29 @@
                                  seq)
                           tx-data)))))
 
-(defn response [state]
+#_(defn response [state]
   (assoc state :response (ok (select-keys state [:problems :tx-result :query-result :query-fields]))))
+
+;; check logical consistency
+;; 1. relations exist?
+;; 2. `relation` attrs exist?
+;; 3. `attr` types exist?
+
+(defn analyze [state] state)
+
+(defn evaluate [{:keys [parsed] :as state}]
+  (do-eval state parsed))
+
+(defn respond [state]
+  (select-keys state [:problems :value]))
 
 (defn process
   [start-state]
   (and-then-> (cleanse start-state)
     (parse)
-    (determine-effects)
-    (answer-queries)
-    (apply-transactions)
-    (response)))
+    (analyze)
+    (evaluate)
+    (respond)))
 
 ;; Interface for Pedestal
 (def accept
