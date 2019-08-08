@@ -461,6 +461,8 @@ lines. It's just easier to read that way most of the time.
 There are a small handful of "commands" that change the behavior of
 the REPL itself. These are not processed as facts or queries:
 
+| Command    | Effect                   |
+|------------+--------------------------+
 | `:quit`    | Exit the REPL            |
 | `:noprint` | Turn output printing off |
 | `:print`   | Turn output back on      |
