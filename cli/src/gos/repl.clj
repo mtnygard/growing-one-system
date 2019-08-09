@@ -1,17 +1,17 @@
 (ns gos.repl
   (:gen-class)
   (:refer-clojure :exclude [print])
-  (:require [clojure.java.io :as io]
+  (:require [clojure.datafy :refer [datafy nav]]
+            [clojure.java.io :as io]
             [clojure.pprint :as pp :refer [pprint]]
+            [clojure.spec-alpha2 :as s]
             [clojure.string :as str]
             [clojure.tools.cli :as cli]
-            [clojure.datafy :refer [datafy nav]]
+            [datomic.api :as d]
             [gos.db :as db]
+            [gos.exec :as exec]
             [gos.seq :as seq]
             [gos.spec-print :as sprint]
-            [gos.world :as world]
-            [datomic.api :as d]
-            [clojure.spec-alpha2 :as s]
             [gos.table :refer [print-table]])
   (:import clojure.lang.LineNumberingPushbackReader
            java.io.StringReader))
@@ -95,7 +95,7 @@
 (defn- repl-eval
   [state input]
   (try
-    (world/process (world/with-input state input))
+    (exec/process (exec/with-input state input))
     (catch Throwable t (throw (eval-error t)))))
 
 (defn- repl-print
@@ -206,11 +206,33 @@
                    (:via ex)))))
 
 (s/def ::tx-data (s/coll-of #(instance? datomic.db.Datum %)))
-(s/def ::ok-response (s/schema [::tx-result ::query-result]))
+
+(s/def ::response (s/schema [::value]))
+(s/def ::ok-value (s/select ::response [:value]))
+
 (s/def ::problems (s/schema [::problems]))
-(s/def ::tx-response (s/select ::ok-response [:tx-result {:tx-result (s/coll-of (s/select ::tx-data [::tx-data]))}]))
-(s/def ::q-response (s/select ::ok-response [:query-result {:query-result set?}]))
+
+(s/def ::tx-result (s/schema [::db-before ::db-after ::tx-data ::tempids]))
+(s/def ::tx-value (s/select ::tx-result [:tx-data]))
+
+(s/def ::query-result (s/schema [::query-result ::query-fields]))
+(s/def ::query-value (s/select ::query-result [:query-result :query-fields]))
+
 (s/def ::problems-response (s/select ::problems [:problems {:problems (s/coll-of ::error)}]))
+
+(s/def ::multivalue sequential?)
+
+(def ^:private ^:dynamic *dbadapter* nil)
+
+(sprint/use ::ok-value
+  (fn [result]
+    (binding [*dbadapter* (:dbadapter result)]
+      (sprint/print (:value result)))))
+
+(sprint/use ::multivalue
+  (fn [vs]
+    (doseq [v vs]
+      (sprint/print (datafy v)))))
 
 (sprint/use ::problems-response
   (fn [result]
@@ -221,18 +243,18 @@
 (defn- datom->map [d] (zipmap [:e :a :v :tx :added?] (eavta? d)))
 (defn- attribute-name [e db-adapter] (:db/ident (db/e db-adapter e)))
 
-(sprint/use ::tx-response
+(sprint/use ::tx-value
   (fn [result]
-    (let [datom-maps (-> result :response :body :tx-result (->> (mapcat :tx-data) (map datom->map)))
-          datom-maps (map #(update % :a attribute-name (-> result :dbadapter)) datom-maps)]
+    (let [datom-maps (map datom->map (:tx-data result))
+          datom-maps (map #(update % :a attribute-name *dbadapter*) datom-maps)]
       (if-not (empty? datom-maps)
         (print-table datom-maps)
         (pp/pprint result)))))
 
-(sprint/use ::q-response
+(sprint/use ::query-value
   (fn [result]
-    (let [matched (-> result :query-result)
-          fields  (mapv name (-> result :query-fields))
+    (let [matched (:query-result result)
+          fields  (mapv name (:query-fields result))
           fields  (if (empty? fields)
                     (let [field-count (reduce max 0 (map count matched))]
                       (map str (range field-count)))
@@ -290,7 +312,7 @@
 
 (defn- initial-state [options]
   (let [datomic-uri (choose-data-location options)
-        base-state  (world/initial-state (db/classic datomic-uri))]
+        base-state  (exec/initial-state (db/classic datomic-uri))]
     (cond-> base-state
       (:quit options)
       (assoc :quit-after-init? true))))
@@ -313,7 +335,7 @@
   (defn p [s]
     (repl-print
       (repl-eval
-        (world/initial-state dbadapter)
+        (exec/initial-state dbadapter)
         s)))
 
 
