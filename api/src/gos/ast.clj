@@ -1,4 +1,5 @@
 (ns gos.ast
+  (:refer-clojure :exclude [instance?])
   (:require [clojure.string :as str]
             [gos.db :as db]))
 
@@ -187,3 +188,17 @@
 
   (evaluate [this state]
     {:where [[(list* pattern)]]}))
+
+;; Testing membership
+
+(def ast-node? (partial satisfies? AST))
+
+(defn- i? [cls] (partial clojure.core/instance? cls))
+
+(def attribute?      (i? Attribute))
+(def relation?       (i? Relation))
+(def instance?       (i? Instance))
+(def query?          (i? Query))
+(def query-relation? (i? QueryRelation))
+(def query-operator? (i? QueryOperator))
+(def let?            (constantly false))

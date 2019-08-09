@@ -66,7 +66,7 @@
 
 (defn- instance-or-query [vs]
   (if (has-lvars? vs)
-    (ast/->Query vs)
+    (ast/->Query [(ast/->QueryRelation (first vs) (rest vs))])
     (ast/->Instance (first vs) (rest vs))))
 
 (defn- transform [parse-tree]

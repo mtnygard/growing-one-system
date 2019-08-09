@@ -1,49 +1,18 @@
 (ns gos.world-test
   (:require [clojure.test :refer :all]
-            [gos.world :as world]
-            [gos.problems :refer [problems?]]
-            [datomic.api :as d]
+            [gos.ast :as ast]
             [gos.datomic-fixtures :as fix]
             [gos.db :as db]
-            [fern :as f]))
-
-(defn- p [body]
-  (world/parse {:body body}))
-
-(defn- first-token [body]
-  (-> body p :parsed second second first))
-
-(deftest parse-inputs
-  (testing "Empty input is accepted"
-    (is (not (problems? (p "")))))
-
-  (testing "Comments are ignored"
-    (is (not (problems? (p "// this is a comment\n")))))
-
-  (testing "parse error handling"
-    (is (problems? (p "no such phrase"))))
-
-  (testing "string literal"
-    (is (not (problems? (p "x \"this is a string\";")))))
-
-  (testing "several declaration forms"
-    (are [token s] (and (not (problems? (p s))) (= token (first-token s)))
-      :attribute   "attr name string one;"
-      :relation    "relation name repo;"
-      :instance    "code \"growing-one-system\" \"https://github.com/mtnygard/growing-one-system\";"
-      :query       "person ?n;"
-      :let-expr    "{ person => person ?name; };"
-      ))
-
-  (testing "Multiple statements"
-    (is (not (problems? (p "attr name string one; attr repo url many; relation code-location name repo;"))))))
+            [gos.exec :as exec]
+            [gos.parser :as parser]
+            [gos.problems :refer [problems?]]))
 
 (defn- process
   [state]
-  (world/process (dissoc state :tx-data)))
+  (exec/process (dissoc state :tx-data)))
 
 (defn- start-state []
-  (world/initial-state (fix/adapter)))
+  (exec/initial-state (fix/adapter)))
 
 (def ^:private attr? fix/lookup-attribute)
 
@@ -56,11 +25,14 @@
     (is (contains? e :relation/ordered-attributes))))
 
 (defn qr [nm & pat]
-  ((world/query-helper-fn (fix/adapter) nm) pat))
+  (->
+    (ast/->Query [(ast/->QueryRelation nm pat)])
+    (ast/evaluate  {:dbadapter (fix/adapter)})
+    :query-result))
 
 (defmacro after [strs & assertions]
   `(fix/with-database []
-     (let [~'end-state (reduce #(process (world/with-input %1 %2)) (start-state) ~strs)]
+     (let [~'end-state (reduce #(exec/process (exec/with-input %1 %2)) (start-state) ~strs)]
        ~@assertions)))
 
 (deftest attribute
@@ -118,16 +90,6 @@
       (is (= #{["rajesh" 25] ["douglas" 25]}
             (qr :person-age '?name 25)))))
 
-  (testing "can have several values added at once"
-    (after ["attr name string one;"
-            "attr age long one;"
-            "relation person-age name age;"
-            "person-age \"douglas\" 25,
-             person-age \"sarai\"   39,
-             person-age \"rajesh\"  25;"]
-      (is (= #{["rajesh" 25] ["douglas" 25]}
-            (qr :person-age '?name 25)))))
-
   (testing "each value is unique"
     (after ["attr name string one;"
             "attr age long one;"
@@ -159,18 +121,14 @@
         (is (= #{["rajesh" 25]}
               (qr :person-age "rajesh" '?age)))
         (is (= #{["rajesh" 3]}
-              (qr :employment-duration "rajesh" '?age))))))
+              (qr :employment-duration "rajesh" '?age)))))))
 
-  (testing "a helper function will query a specific relation"
-    (after ["attr name string one;"
-            "attr age long one;"
-            "relation person-age name age;"
-            "person-age \"rajesh\" 25;"]
-      (let [qfn (world/query-helper-fn (fix/adapter) :person-age)]
-        (is (= 1 (count (qfn ["rajesh" '?age]))))))))
-
-(defn- ok? [{:keys [response]}]
-  (= 200 (:status response)))
+(defn- pq [qstr]
+  (->> qstr
+    (exec/with-input (start-state))
+    exec/process
+    :value
+    first))
 
 (deftest queries
   (testing "a query looks like an instance with a logic variable"
@@ -178,9 +136,7 @@
             "attr age long one;"
             "relation person-age name age;"
             "person-age \"rajesh\" 25;"]
-      (let [result (world/process (world/with-input (start-state) "person-age ?name 25;"))]
-        (is (ok? result))
-        (is (= #{["rajesh" 25]} (-> result :response :body :query-result))))))
+      (is (= #{["rajesh" 25]} (:query-result (pq "person-age ?name 25;"))))))
 
   (testing "querying a single-value relation returns the set of values"
     (after ["attr name string one;"
@@ -188,9 +144,7 @@
             "person \"douglas\";"
             "person \"sarai\";"
             "person \"rajesh\";"]
-      (let [result (world/process (world/with-input (start-state) "person ?n;"))]
-        (is (ok? result))
-        (is (= #{["rajesh"] ["sarai"] ["douglas"]} (-> result :response :body :query-result))))))
+      (is (= #{["rajesh"] ["sarai"] ["douglas"]} (:query-result (pq "person ?n;"))))))
 
   (testing "a query can have multiple clauses"
     (after ["attr name string one;"
@@ -200,11 +154,7 @@
             "attr location string one;"
             "relation assignment name location;"
             "assignment \"rajesh\" \"southlake\";"]
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "person-age ?name 25, assignment ?name \"southlake\";"))]
-        (is (ok? result))
-        (is (= #{["rajesh" 25 "southlake"]} (-> result :response :body :query-result))))))
+      (is (= #{["rajesh" 25 "southlake"]} (:query-result (pq "person-age ?name 25, assignment ?name \"southlake\";"))))))
 
   (testing "junction"
     (after ["attr name string one;"
@@ -213,11 +163,7 @@
             "person-age \"douglas\" 25;"
             "person-age \"sarai\"   39;"
             "person-age \"rajesh\"  25;"]
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "person-age ?name ?age, = ?name \"rajesh\";"))]
-        (is (ok? result))
-        (is (= #{["rajesh" 25]} (-> result :response :body :query-result))))))
+      (is (=  #{["rajesh" 25]} (:query-result (pq "person-age ?name ?age, = ?name \"rajesh\";"))))))
 
   (testing "disjunction"
     (after ["attr name string one;"
@@ -226,11 +172,7 @@
             "person-age \"douglas\" 25;"
             "person-age \"sarai\"   39;"
             "person-age \"rajesh\"  25;"]
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "person-age ?name 25, != ?name \"rajesh\";"))]
-        (is (ok? result))
-        (is (= #{["douglas" 25]} (-> result :response :body :query-result))))))
+      (is (=  #{["douglas" 25]} (:query-result (pq "person-age ?name 25, != ?name \"rajesh\";"))))))
 
   (testing "inequality"
     (after ["attr name string one;"
@@ -239,26 +181,11 @@
             "person-age \"douglas\" 25;"
             "person-age \"sarai\"   39;"
             "person-age \"rajesh\"  25;"]
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "person-age ?name ?age, < ?age 30;"))]
-        (is (ok? result))
-        (is (= #{["douglas" 25] ["rajesh" 25]} (-> result :response :body :query-result))))
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "person-age ?name ?age, <= ?age 25;"))]
-        (is (ok? result))
-        (is (= #{["douglas" 25] ["rajesh" 25]} (-> result :response :body :query-result))))
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "person-age ?name ?age, > ?age 30;"))]
-        (is (ok? result))
-        (is (= #{["sarai" 39]} (-> result :response :body :query-result))))
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "person-age ?name ?age, >= ?age 39;"))]
-        (is (ok? result))
-        (is (= #{["sarai" 39]} (-> result :response :body :query-result))))))
+      (are [expected query] (= expected (:query-result (pq query)))
+        #{["douglas" 25] ["rajesh" 25]} "person-age ?name ?age, < ?age 30;"
+        #{["douglas" 25] ["rajesh" 25]} "person-age ?name ?age, <= ?age 25;"
+        #{["sarai" 39]}                 "person-age ?name ?age, > ?age 30;"
+        #{["sarai" 39]}                 "person-age ?name ?age, >= ?age 39;")))
 
   (testing "self-joins are allowed"
     (after ["attr a string one;"
@@ -266,11 +193,7 @@
             "relation foo a b;"
             "foo \"cake\" \"pie\";"
             "foo \"cake\" \"cake\";"]
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "foo ?a ?a;"))]
-        (is (ok? result))
-        (is (= #{["cake"]} (-> result :response :body :query-result)))))))
+      (is (= #{["cake"]} (:query-result (pq "foo ?a ?a;")))))))
 
 (deftest query-fields
   (testing "fields are named for the logic variables"
@@ -278,21 +201,13 @@
             "relation location name;"
             "location \"NYC\";"
             "location \"anywhere else\";"]
-      (let [result (world/process (world/with-input (start-state) "location ?name;"))]
-        (is (ok? result))
-        (is (= '[?name] (-> result :response :body :query-fields))))
-      (let [result (world/process (world/with-input (start-state) "location ?cake;"))]
-        (is (ok? result))
-        (is (= '[?cake] (-> result :response :body :query-fields)))))
+      (is (= '[?name] (:query-fields (pq "location ?name;"))))
+      (is (= '[?cake] (:query-fields (pq "location ?cake;")))))
 
     (after ["attr name string one;"
             "relation seats name name name name;"
             "seats \"a\" \"b\" \"c\" \"d\";"]
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "seats ?a ?b ?c ?d;"))]
-        (is (ok? result))
-        (is (= '[?a ?b ?c ?d] (-> result :response :body :query-fields)))))
+      (is (= '[?a ?b ?c ?d] (:query-fields (pq "seats ?a ?b ?c ?d;")))))
 
     (after ["attr name string one;"
             "attr age long one;"
@@ -304,44 +219,30 @@
             "person-title \"douglas\" \"associate\";"
             "person-title \"sarai\"   \"staff\";"
             "person-title \"joan\"    \"host\";"]
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "person-age ?name ?age, person-title ?name ?title;"))]
-        (is (ok? result))
-        (is (= #{["douglas" 25 "associate"]
-                 ["sarai"   39 "staff"]}
-              (-> result :response :body :query-result)))
-        (is (= '[?name ?age ?title] (-> result :response :body :query-fields)))))))
+      (is (= '[?name ?age ?title] (:query-fields (pq "person-age ?name ?age, person-title ?name ?title;")))))))
 
 (deftest fields-are-ordered-not-named
   (testing "an instance's fields are kept separate"
     (after ["attr name string one;"
             "relation seats name name name name;"
             "seats \"a\" \"b\" \"c\" \"d\";"]
-      (let [result (world/process (world/with-input
-                                    (start-state)
-                                    "seats ?a ?b ?c ?d;"))]
-        (is (= #{["a" "b" "c" "d"]} (-> result :response :body :query-result)))))))
+      (is (= #{["a" "b" "c" "d"]} (:query-result (pq "seats ?a ?b ?c ?d;")))))))
 
 (deftest colon-is-shorthand-for-repetition
   (testing "in instances"
     (after ["attr id symbol one;"
             "relation diagram id;"
             "diagram: sysml-diagram behavior-diagram requirements-diagram;"]
-      (let [result (world/process (world/with-input (start-state)
-                                    "diagram ?a;"))]
-        (is (= #{['sysml-diagram] ['behavior-diagram] ['requirements-diagram]}
-              (-> result :response :body :query-result)))))
+      (is (=  #{['sysml-diagram] ['behavior-diagram] ['requirements-diagram]}
+            (:query-result (pq "diagram ?a;")))))
 
     (after ["attr id symbol one;"
             "relation specialize id id;"
             "specialize sysml-diagram: behavior-diagram requirements-diagram structural-diagram;"]
-      (let [result (world/process (world/with-input (start-state)
-                                    "specialize ?par ?cld;"))]
-        (is (= #{'[sysml-diagram behavior-diagram]
+      (is (=  #{'[sysml-diagram behavior-diagram]
                  '[sysml-diagram requirements-diagram]
-                 '[sysml-diagram structural-diagram]}
-              (-> result :response :body :query-result)))))
+                '[sysml-diagram structural-diagram]}
+            (:query-result (pq "specialize ?par ?cld;")))))
 
     (after ["attr id symbol one;"
             "attr label string one;"
@@ -351,10 +252,7 @@
                block-definition-diagram \"bdd\" \"Block Definition Diagram\"
                internal-block-diagram   \"ibd\" \"Internal Block Diagram\"
                package-diagram          \"pkg\" \"Package Diagram\";"]
-      (let [result (world/process (world/with-input (start-state)
-                                    "diagram-kind ?kind ?tag ?label;"))]
-        (is (= 4 (count
-                   (-> result :response :body :query-result))))))))
+      (is (= 4 (count (:query-result (pq "diagram-kind ?kind ?tag ?label;"))))))))
 
 (deftest relations-can-constrain-values
   (testing "values in the confining relation are accepted"
@@ -362,29 +260,25 @@
             "relation direction name;"
             "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"
             "relation arrow (name in direction);"]
-      (let [result (world/process (world/with-input (start-state)
-                                    "arrow \"N\";"))]
-        (is (ok? result)))))
+      (pq "arrow \"N\";")))
 
   (testing "values not in the confining relation are rejected"
     (after ["attr name string one;"
             "relation direction name;"
             "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"
             "relation arrow (name in direction);"]
-      (let [result (world/process (world/with-input (start-state)
-                                    "arrow \"to the knee\";"))]
-        (is (not (ok? result)))))))
+      (is (thrown? AssertionError (pq "arrow \"to the knee\";"))))))
 
 #_(deftest let-expressions
   (testing "return maps in their results"
-    (let [result (world/process (world/with-input (start-state)
+    (let [result (exec/process (exec/with-input (start-state)
                                   "{ };"))]
       (is (ok? result))
       (is (= {} (-> result :response :body))))
     )
 
   (testing "allow constant values"
-    (let [result (world/process (world/with-input (start-state)
+    (let [result (exec/process (exec/with-input (start-state)
                                   "{ a => b };"))]
       (is (ok? result))
       (is (= {'a 'b} (-> result :response :body)))))
@@ -394,7 +288,7 @@
             "relation direction name;"
             "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
 
-      (let [result (world/process (world/with-input (start-state)
+      (let [result (exec/process (exec/with-input (start-state)
                                     "{ dir => direction ?d; };"))]
         (is (ok? result))
         (is (= {'dir #{["N"] ["NE"] ["E"] ["SE"] ["S"] ["SW"] ["W"] "NW"}})))))
@@ -406,7 +300,7 @@
             "relation direction name;"
             "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
 
-      (let [result (world/process (world/with-input (start-state)
+      (let [result (exec/process (exec/with-input (start-state)
                                     "{ dir => direction ?d;
                                        person => person ?name; };"))]
         (is (ok? result))
@@ -423,7 +317,7 @@
             "relation direction name;"
             "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
 
-      (let [result (world/process (world/with-input (start-state)
+      (let [result (exec/process (exec/with-input (start-state)
                                     "{ dir => direction ?d;
                                        person => person-age ?name ?age,
                                                  = ?age 39; };"))]

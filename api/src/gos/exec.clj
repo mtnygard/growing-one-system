@@ -25,10 +25,10 @@
     (assoc state :parsed (parser/parse body))))
 
 (defn- execute [{:keys [parsed] :as state}]
-  (ast/evaluate parsed state))
+  (assoc state :value
+    (ast/evaluate parsed state)))
 
-(defn- respond [state]
-  (select-keys state [:problems :value]))
+(defn- respond [state] state)
 
 ;; ========================================
 ;; Public interface
