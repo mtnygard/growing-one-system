@@ -92,6 +92,7 @@
   (problems [this state]
     ;; todo - check that the type exists, nm is a keyword
     nil)
+
   (evaluate [this state]
     @(db/transact (:dbadapter state)
        (db/mkattr (:dbadapter state) nm type card))))
@@ -101,8 +102,8 @@
   (problems [this state]
     ;; todo - check attrs exist
     ;; todo - check any constraints are legit
-    nil
-    )
+    nil)
+
   (evaluate [this state]
     (mapv #(update
              (deref (db/transact (:dbadapter state) %))
@@ -141,14 +142,16 @@
     nil)
 
   (evaluate [this state]
-    (doseq [:let [rel   (relation (:dbadapter state) relnm)
-                  attrs (relation-attributes rel)
-                  _     (assert-has-attributes relnm attrs)]
-            vals (unpack-repeats (count attrs) vals)]
-      (update
-        (deref (db/transact (:dbadapter state) [(db/mkent (:dbadapter state) relnm attrs vals)]))
-        :tx-data
-        seq))))
+    (let [rel (relation (:dbadapter state) relnm)
+          attrs (relation-attributes rel)]
+      (assert-has-attributes relnm attrs)
+      (let [vals (unpack-repeats (count attrs) vals)]
+        (mapv
+          #(update
+             (deref (db/transact (:dbadapter state) [(db/mkent (:dbadapter state) relnm attrs %)]))
+             :tx-data
+             seq)
+          vals)))))
 
 (defrecord Query [clauses]
   AST
