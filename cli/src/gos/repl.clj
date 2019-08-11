@@ -12,7 +12,8 @@
             [gos.exec :as exec]
             [gos.seq :as seq]
             [gos.spec-print :as sprint]
-            [gos.table :refer [print-table]])
+            [gos.table :refer [print-table]]
+            gos.mustache)
   (:import clojure.lang.LineNumberingPushbackReader
            java.io.StringReader))
 
@@ -210,15 +211,14 @@
 (s/def ::response (s/schema [::value]))
 (s/def ::ok-value (s/select ::response [:value]))
 
-(s/def ::problems (s/schema [::problems]))
-
 (s/def ::tx-result (s/schema [::db-before ::db-after ::tx-data ::tempids]))
 (s/def ::tx-value (s/select ::tx-result [:tx-data]))
 
 (s/def ::query-result (s/schema [::query-result ::query-fields]))
 (s/def ::query-value (s/select ::query-result [:query-result :query-fields]))
 
-(s/def ::problems-response (s/select ::problems [:problems {:problems (s/coll-of ::error)}]))
+(s/def ::problems (s/schema [::problems]))
+(s/def ::problems-response (s/select ::problems [:problems]))
 
 (s/def ::multivalue sequential?)
 
