@@ -25,7 +25,7 @@
 (def ^:private grammar
   (insta/parser
    "input            = expr*
-    <expr>           = ( attribute-decl / relation-decl / map-expr / instance-expr / query-expr ) <';'>
+    <expr>           = ( boolean-literal / string-literal / long-literal / date-literal / attribute-decl / relation-decl / map-expr / instance-expr / query-expr ) <';'>
 
     attribute-decl   = <'attr'> name type cardinality
 

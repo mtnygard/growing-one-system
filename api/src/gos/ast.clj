@@ -10,6 +10,21 @@
   (problems [this state] "Return coll of problems with this AST node")
   (evaluate [this state] "Return the AST node's value."))
 
+;; make a few basic objects act like AST nodes.
+;; these can never have problems, and they evaluate to themselves
+(extend-protocol AST
+  Boolean
+  (problems [this state] nil)
+  (evaluate [this state] this)
+
+  String
+  (problems [this state] nil)
+  (evaluate [this state] this)
+
+  Long
+  (problems [this state] nil)
+  (evaluate [this state] this))
+
 ;; Sanity checks
 (defn assert-has-attributes [nm attrs]
   (assert
@@ -212,8 +227,7 @@
   AST
   (problems [this state]
     ;; todo - analyze RHS of bindings for problems.
-    nil
-    )
+    nil)
 
   (evaluate [this state]
     (when debug/*debug-evaluation*
