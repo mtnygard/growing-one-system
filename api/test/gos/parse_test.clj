@@ -34,7 +34,7 @@
       ast/relation?  "relation name repo;"
       ast/instance?  "code \"growing-one-system\" \"https://github.com/mtnygard/growing-one-system\";"
       ast/query?     "person ?n;"
-#_#_      ast/let?       "{ person => person ?name; };"
+      ast/binding?   "{ person => person ?name; };"
       ))
 
   (testing "query clauses are also nodes"

@@ -25,7 +25,7 @@
 (def ^:private grammar
   (insta/parser
    "input            = expr*
-    <expr>           = ( attribute-decl / relation-decl / let-expr / instance-expr / query-expr ) <';'>
+    <expr>           = ( attribute-decl / relation-decl / map-expr / instance-expr / query-expr ) <';'>
 
     attribute-decl   = <'attr'> name type cardinality
 
@@ -34,7 +34,7 @@
     constrained-name = <'('> name constraint <')'>
     constraint       = 'in' name
 
-    let-expr         = <'{'> ( name <'=>'> expr )* <'}'>
+    map-expr         = <'{'> ( name <'=>'> expr )* <'}'>
 
     instance-expr    = name repeat? value ( repeat? value )*
     value            = symbol | string-literal | long-literal | boolean-literal | date-literal
@@ -78,6 +78,7 @@
      :instance-clause  (fn [r & xs] (ast/->QueryRelation r xs))
      :operator-clause  (fn [& pat]  (ast/->QueryOperator pat))
      :query-expr       (fn [& clauses] (ast/->Query clauses))
+     :map-expr         (fn [& bindings] (ast/->Binding (apply hash-map bindings)))
      :name             keyword
      :type             keyword
      :cardinality      keyword

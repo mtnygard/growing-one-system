@@ -5,11 +5,9 @@
             [datomic.client.api :as dclient]
             [fern :as f]
             [gos.char :as char]
+            [gos.debug :as debug]
             [gos.seq :refer [conjv]]
             [io.pedestal.interceptor :as i]))
-
-(def ^:dynamic *debug-query* nil)
-(def ^:dynamic *debug-transaction* nil)
 
 ;; Kernel attributes
 
@@ -66,7 +64,7 @@
 (defrecord DClassic [uri conn]
   Tx
   (transact [this tx-data]
-    (when *debug-transaction*
+    (when debug/*debug-transaction*
       (println 'transact tx-data))
     (dclassic/transact conn tx-data))
   Db
@@ -74,7 +72,7 @@
     (dclassic/db conn))
   Q
   (q [this query args]
-    (when *debug-query*
+    (when debug/*debug-query*
       (println 'query query (list* args)))
     (apply dclassic/q query (db this) (list* args)))
   (e [this eid]

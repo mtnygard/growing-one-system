@@ -5,7 +5,8 @@
             [gos.db :as db]
             [gos.exec :as exec]
             [gos.parser :as parser]
-            [gos.problems :refer [problems?]]))
+            [gos.problems :refer [problems?]]
+            [gos.debug :as debug]))
 
 (defn- process
   [state]
@@ -252,6 +253,8 @@
                block-definition-diagram \"bdd\" \"Block Definition Diagram\"
                internal-block-diagram   \"ibd\" \"Internal Block Diagram\"
                package-diagram          \"pkg\" \"Package Diagram\";"]
+      (is (= #{['activity-diagram "act" "Activity Diagram"]}
+            (:query-result (pq "diagram-kind ?d ?a ?b, = ?a \"act\"; "))))
       (is (= 4 (count (:query-result (pq "diagram-kind ?kind ?tag ?label;"))))))))
 
 (deftest relations-can-constrain-values
@@ -269,58 +272,45 @@
             "relation arrow (name in direction);"]
       (is (thrown? AssertionError (pq "arrow \"to the knee\";"))))))
 
-#_(deftest let-expressions
-  (testing "return maps in their results"
-    (let [result (exec/process (exec/with-input (start-state)
-                                  "{ };"))]
-      (is (ok? result))
-      (is (= {} (-> result :response :body))))
-    )
+(defn- pb [input]
+  (let [res (:value
+             (process
+               (exec/with-input
+                 (start-state)
+                 input)))]
+    (if (instance? Throwable res)
+      (throw res)
+      (first res))))
 
-  (testing "allow constant values"
-    (let [result (exec/process (exec/with-input (start-state)
-                                  "{ a => b };"))]
-      (is (ok? result))
-      (is (= {'a 'b} (-> result :response :body)))))
+(defn- expect [fields result]
+  {:query-fields (vec fields)
+   :query-result (set result)})
 
-  (testing "allow queries as the right hand side"
-    (after ["attr name string one;"
-            "relation direction name;"
-            "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
+(deftest binding-expressions
+  (after ["attr id symbol one;"
+          "attr label string one;"
+          "attr name string one;"
+          "relation diagram-kind id label label;"
+          "diagram-kind:
+               activity-diagram         \"act\" \"Activity Diagram\"
+               block-definition-diagram \"bdd\" \"Block Definition Diagram\"
+               internal-block-diagram   \"ibd\" \"Internal Block Diagram\"
+               package-diagram          \"pkg\" \"Package Diagram\";"
+          "relation direction name;"
+          "direction:\"N\" \"E\" \"S\" \"W\";"
+          "relation arrow (name in direction);"]
 
-      (let [result (exec/process (exec/with-input (start-state)
-                                    "{ dir => direction ?d; };"))]
-        (is (ok? result))
-        (is (= {'dir #{["N"] ["NE"] ["E"] ["SE"] ["S"] ["SW"] ["W"] "NW"}})))))
+    (are [qry m] (= m (pb qry))
+      "{ };"
+      {}
 
-  (testing "allow multiple bindings"
-    (after ["attr name string one;"
-            "relation person name;"
-            "person: \"rajesh\" \"sarai\" \"douglas\";"
-            "relation direction name;"
-            "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
+      "{ a => direction ?dir; };"
+      {:a (expect ['?dir] #{["N"] ["E"] ["S"] ["W"]})}
 
-      (let [result (exec/process (exec/with-input (start-state)
-                                    "{ dir => direction ?d;
-                                       person => person ?name; };"))]
-        (is (ok? result))
-        (is (= {'dir #{["N"] ["NE"] ["E"] ["SE"] ["S"] ["SW"] ["W"] ["NW"]}
-                'person #{["rajesh"] ["sarai"] ["douglas"]}})))))
-
-  (testing "allow multiple clauses on the right hand side"
-    (after ["attr name string one;"
-            "attr age long one;"
-            "relation person-age name age;"
-            "person-age \"douglas\" 25;"
-            "person-age \"sarai\"   39;"
-            "person-age \"rajesh\"  25;"
-            "relation direction name;"
-            "direction:\"N\" \"NE\" \"E\" \"SE\" \"S\" \"SW\" \"W\" \"NW\";"]
-
-      (let [result (exec/process (exec/with-input (start-state)
-                                    "{ dir => direction ?d;
-                                       person => person-age ?name ?age,
-                                                 = ?age 39; };"))]
-        (is (ok? result))
-        (is (= {'dir #{["N"] ["NE"] ["E"] ["SE"] ["S"] ["SW"] ["W"] ["NW"]}
-                'person #{["sarai"]}}))))))
+      "{ dir    => direction ?d;
+         dia    => diagram-kind ?d ?a ?b,
+                   = ?a \"act\"; };"
+      {:dir (expect ['?d] #{["N"] ["E"] ["S"] ["W"]})
+       :dia (expect
+              ['?d '?a '?b]
+              #{['activity-diagram "act" "Activity Diagram"]})})))

@@ -1,7 +1,8 @@
 (ns gos.ast
   (:refer-clojure :exclude [instance?])
   (:require [clojure.string :as str]
-            [gos.db :as db]))
+            [gos.db :as db]
+            [gos.debug :as debug]))
 
 ;; Abstract Syntax Tree
 
@@ -85,7 +86,9 @@
     (mapv #(problems % state) exprs))
 
   (evaluate [this state]
-    (mapv #(evaluate % state) exprs)))
+    (when debug/*debug-evaluation*
+      (debug/indent-print state "Exprs"))
+    (mapv #(evaluate % (debug/indent state)) exprs)))
 
 (defrecord Attribute [nm type card]
   AST
@@ -94,6 +97,8 @@
     nil)
 
   (evaluate [this state]
+    (when debug/*debug-evaluation*
+      (debug/indent-print state "Attribute"))
     @(db/transact (:dbadapter state)
        (db/mkattr (:dbadapter state) nm type card))))
 
@@ -105,6 +110,8 @@
     nil)
 
   (evaluate [this state]
+    (when debug/*debug-evaluation*
+      (debug/indent-print state "Relation"))
     (mapv #(update
              (deref (db/transact (:dbadapter state) %))
              :tx-data
@@ -142,6 +149,8 @@
     nil)
 
   (evaluate [this state]
+    (when debug/*debug-evaluation*
+      (debug/indent-print state "Instance"))
     (let [rel (relation (:dbadapter state) relnm)
           attrs (relation-attributes rel)]
       (assert-has-attributes relnm attrs)
@@ -159,6 +168,8 @@
     nil)
 
   (evaluate [this state]
+    (when debug/*debug-evaluation*
+      (debug/indent-print state "Query"))
     (let [dbadapter (:dbadapter state)
           query     (reduce merge-query empty-query (map #(evaluate % state) clauses))]
       {:query-result (run-query dbadapter query)
@@ -167,11 +178,14 @@
 (defrecord QueryRelation [relnm pattern]
   AST
   (problems [this state]
+    ;; todo - check relation exists
     ;; (assert-has-attributes nm attrs)
     ;; (assert-sufficient-pattern nm attrs pattern)
     nil)
 
   (evaluate [this state]
+    (when debug/*debug-evaluation*
+      (debug/indent-print state "QueryRelation"))
     (let [dbadapter (:dbadapter state)
           rel       (relation dbadapter relnm)
           attrs     (relation-attributes rel)
@@ -190,7 +204,23 @@
     nil)
 
   (evaluate [this state]
+    (when debug/*debug-evaluation*
+      (debug/indent-print state "QueryOperator"))
     {:where [[(list* pattern)]]}))
+
+(defrecord Binding [bindings]
+  AST
+  (problems [this state]
+    ;; todo - analyze RHS of bindings for problems.
+    nil
+    )
+
+  (evaluate [this state]
+    (when debug/*debug-evaluation*
+      (debug/indent-print state "Bindings"))
+    (zipmap
+      (keys bindings)
+      (mapv #(evaluate % (debug/indent state)) (vals bindings)))))
 
 ;; Testing membership
 
@@ -204,4 +234,4 @@
 (def query?          (i? Query))
 (def query-relation? (i? QueryRelation))
 (def query-operator? (i? QueryOperator))
-(def let?            (constantly false))
+(def binding?        (i? Binding))
