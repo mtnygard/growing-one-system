@@ -25,8 +25,11 @@
   (testing "parse error handling"
     (is (thrown? ExceptionInfo (p "no such phrase"))))
 
-  (testing "string literal"
-    (is (p "x \"this is a string\";")))
+  (testing "literals"
+    (are [s expected] (= expected (first (:exprs (p s))))
+      "\"this is a string\";" "this is a string"
+      "true;"                 true
+      "[1 2 3];"              [1 2 3]))
 
   (testing "several declaration forms"
     (are [kind? s] (kind? (first-expr (p s)))

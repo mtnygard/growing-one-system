@@ -23,6 +23,10 @@
 
   Long
   (problems [this state] nil)
+  (evaluate [this state] this)
+
+  clojure.lang.APersistentVector
+  (problems [this state] nil)
   (evaluate [this state] this))
 
 ;; Sanity checks

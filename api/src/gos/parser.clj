@@ -25,7 +25,7 @@
 (def ^:private grammar
   (insta/parser
    "input            = expr*
-    <expr>           = ( boolean-literal / string-literal / long-literal / date-literal / attribute-decl / relation-decl / map-expr / instance-expr / query-expr ) <';'>
+    <expr>           = ( boolean-literal / string-literal / long-literal / date-literal / vector-literal / attribute-decl / relation-decl / map-expr / instance-expr / query-expr ) <';'>
 
     attribute-decl   = <'attr'> name type cardinality
 
@@ -52,6 +52,7 @@
     long-literal     = #\"-?[0-9]+\"
     date-literal     = #\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"
     boolean-literal  = 'true' | 'false'
+    vector-literal   = <'['> value* <']'>
     cardinality      = 'one' | 'many'
     operator         = '=' | '!=' | '<' | '<=' | '>' | '>='"
    :auto-whitespace whitespace-or-comments))
@@ -79,6 +80,7 @@
      :operator-clause  (fn [& pat]  (ast/->QueryOperator pat))
      :query-expr       (fn [& clauses] (ast/->Query clauses))
      :map-expr         (fn [& bindings] (ast/->Binding (apply hash-map bindings)))
+     :vector-literal   vector
      :name             keyword
      :type             keyword
      :cardinality      keyword

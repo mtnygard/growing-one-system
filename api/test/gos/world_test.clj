@@ -314,3 +314,10 @@
        :dia (expect
               ['?d '?a '?b]
               #{['activity-diagram "act" "Activity Diagram"]})})))
+
+(deftest vector-expressions
+  (are [s expected] (= expected (pb s))
+    "[];"                []
+    "[1 2 3];"           [1 2 3]
+    "[true false];"      [true false]
+    "[true 2 \"cake\"];" [true 2 "cake"]))
