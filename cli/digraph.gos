@@ -1,0 +1,29 @@
+attr content string one;
+attr id symbol one;
+
+relation template content id;
+
+template:
+   "digraph G {
+     {{ #nodes }}
+       once per node
+       {{ query-result }}
+     {{ /nodes }}
+   }"
+   g3;
+
+attr label string one;
+relation node-label id label;
+relation node-depends id id;
+
+node-label:
+ a "A"
+ b "B"
+ c "C";
+
+node-depends a: b c;
+
+{
+  mustache => template ?c g3;
+  nodes => node-label ?id ?label;
+};
