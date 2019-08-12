@@ -7,7 +7,7 @@
 
 ;; these fields are only used during processing of one input
 (def ^:private transient-fields
-  [:response :tx-data :parsed :tx-result :query-result :problems :query :query-fields])
+  [:response :value :parsed :problems])
 
 (defn- cleanse [state]
   (apply dissoc state transient-fields))

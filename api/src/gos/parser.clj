@@ -95,8 +95,26 @@
      :operator         symbol}
    parse-tree))
 
+;; this has to match the production rule for `expr` in the grammar above
+(def ^:private expr-productions
+  #{:boolean-literal :string-literal :long-literal :date-literal :attribute-decl :relation-decl :map-expr :instance-expr :query-expr})
+
+(defn- complete-statement? [ast]
+  (and (= :input (first ast))
+    (expr-productions (first (second ast)))))
+
+(defn- partial-parses [body]
+  (insta/parses grammar body :partial true))
+
 ;; ========================================
 ;; Public interface
+
+;; this is more sensitive to the grammar structure than I'd like
+(defn command-complete? [body]
+  (->> body
+    partial-parses
+    (filter complete-statement?)
+    not-empty))
 
 (defn parse [body]
   (let [result (insta/parse grammar body)]

@@ -13,7 +13,8 @@
             [gos.seq :as seq]
             [gos.spec-print :as sprint]
             [gos.table :refer [print-table]]
-            gos.mustache)
+            gos.mustache
+            [gos.parser :as parser])
   (:import clojure.lang.LineNumberingPushbackReader
            java.io.StringReader))
 
@@ -79,7 +80,7 @@
      (if (= -1 c)
        ":quit"
        (let [buf (str buf (char c))]
-         (if (= (int \;) c)
+         (if (parser/command-complete? buf)
            buf
            (recur s buf)))))))
 
