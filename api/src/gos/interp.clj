@@ -13,11 +13,11 @@
 (defp empty-environment {:symtab {} :stack [] :error-stack []})
 
 ;; Names are bound in an environment
-(defn- bind [env s v] (assoc-in env [:symtab s] v))
-(defn- find [env s]   (get-in env [:symtab s]))
+(defn- bind [s v env] (assoc-in env [:symtab s] v))
+(defn- find [s env]   (get-in env [:symtab s]))
 
 ;; The stack records where we are executing
-(defn- push-frame [env fr] (update-in env [:stack] conj fr))
+(defn- push-frame [fr env] (update-in env [:stack] conj fr))
 (defn- pop-frame  [env]    (update-in env [:stack] pop))
 
 ;; A name is a symbol
@@ -34,24 +34,24 @@
 (defp stacktrace :stack)
 
 ;; "Raising" an error means we stop evaluating
-(defn- push-error [env err] (update-in env [:error-stack] conj err))
+(defn- push-error [err env] (update-in env [:error-stack] conj err))
 (defn- clear-error [env]    (assoc-in env [:error-stack] []))
-(defn- raise [env err]      (push-error env {:cause err :at (stacktrace env)}))
+(defn- raise [err env]      (push-error {:cause err :at (stacktrace env)} env))
 (defp  errors :error-stack)
 
 ;; Evaluating a form is polymorphic
 (defprotocol Eval
   (frame [this]        "Return a stack frame describing this form")
-  (evaluate [this env] "Evaluation depends on what the first expression is"))
+  (evaluate [this env] "Evaluation depends on what the first expression is. Return pair of value and new env"))
 
 ;; Interpretation begins with a top-level form and an environment.
 ;; The environment probably contains bindings from previous forms.
-(defn- interpret [env top]
-  (let [env (push-frame env (frame top))]
-    (let [[env val] (evaluate top env)]
+(defn- interpret [top env]
+  (let [env (push-frame (frame top) env)]
+    (let [[val env] (evaluate top env)]
       (if (not-empty (errors env))
-        (errors env)
-        [(pop-frame env) val]))))
+        [nil env]
+        [val (pop-frame env)]))))
 
 ;; A symbol looks itself up in the environment
 (defrecord Symbol [s ast]
@@ -60,9 +60,9 @@
     (mkframe 'Symbol nil ast))
 
   (evaluate [this env]
-    (if-let [v (find env s)]
-      [env v]
-      [(raise env (str "Symbol " s " is not defined")) nil])))
+    (if-let [v (find s env)]
+      [v env]
+      [nil (raise (str "Symbol " s " is not defined") env)])))
 
 (defrecord Literal [val ast]
   Eval
@@ -70,21 +70,73 @@
     (mkframe 'Literal nil ast))
 
   (evaluate [this env]
-    [env val]))
+    [val env]))
 
-(defrecord Map [m ast]
+(defn- eval-vec [xs env]
+  (reduce
+    (fn [[vals env] f]
+      (let [[v e] (evaluate f env)]
+        [(conj vals v) e]))
+    [[] env]
+    xs))
+
+(defrecord Map [kvs ast]
   Eval
   (frame [this]
-    (mkframe 'Map nil ast))
+    (mkframe 'Map kvs ast))
 
   (evaluate [this env]
-    (zipmap
-      (map #(evaluate % env) (keys m))
-      (map #(evaluate % env) (vals m)))))
+    (let [env      (push-frame (frame this) env)
+          [vs env] (eval-vec kvs env)]
+      [(apply hash-map vs) (pop-frame env)])))
 
-(defrecord Statement [head tail ast]
+(defn- fcall [f args env]
+  [(apply f args) env])
+
+(defrecord Statement [hd tl ast]
   Eval
-  (frame [this] (mkframe head tail ast))
+  (frame [this] (mkframe hd tl ast))
   (evaluate [this env]
+    (let [fr   (frame this)
+          env  (push-frame fr env)
+          body (find hd env)]
+      (if-not body
+        [nil env]
+        (let [[args env] (eval-vec tl env)
+              [v env]    (fcall body args env)]
+          [v (pop-frame env)])))))
 
-    ))
+
+
+
+(comment
+
+  (interpret (Map. [(Symbol. 'ofo {}) (Symbol. 'bar {})] {})
+    empty-environment)
+
+  (->> empty-environment
+    (bind 'foo :a))
+
+  (->> empty-environment
+    (bind 'foo :a)
+    (interpret (Symbol. 'foo {})))
+
+
+  (->> empty-environment
+    (bind 'foo :b)
+    (interpret (Map. [(Symbol. 'foo {}) (Literal. 10 {})
+                      (Literal. :a {})  (Literal. "this is the day" {})]
+                 {})))
+
+  (->> empty-environment
+    (bind 'print println)
+    (bind 'foo :b)
+    (interpret
+      (Statement. 'print
+        [(Map. [(Symbol. 'foo {}) (Literal. 10 {})
+                 (Literal. :a {})  (Literal. "this is the day" {})]
+            {})]
+        {})))
+
+
+  )
