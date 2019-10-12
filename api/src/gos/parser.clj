@@ -45,9 +45,9 @@
     operator-clause  = operator value*
 
     repeat           = <':'>
-    name             = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
+    name             = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?.]*\"
     type             = #\"[a-zA-Z_][a-zA-Z0-9]*\"
-    symbol           = #\"[a-zA_Z_0-9\\?][a-zA_Z_0-9\\?\\-\\$%*]*\"
+    symbol           = #\"[a-zA_Z_0-9\\?][a-zA_Z_0-9\\?\\-\\$%*.]*\"
     string-literal   = #\"\\\"(\\.|[^\\\"])*\\\"\"
     long-literal     = #\"-?[0-9]+\"
     date-literal     = #\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"
