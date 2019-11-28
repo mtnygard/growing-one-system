@@ -13,11 +13,13 @@
 (def- empty-environment {:symtab {} :stack [] :error-stack []})
 
 ;; Names are bound in an environment
-(defn- bind [s v env] (assoc-in env [:symtab s] v))
-(defn- find [s env]   (get-in env [:symtab s]))
+(def-  symtab :symtab)
+(defn- bind [s v env]  (assoc-in env [symtab s] v))
+(defn- find [s env]    (get-in env [symtab s]))
+(defn- binds [env svs] (reduce-kv (fn [env s v] (bind s v env)) env svs))
 
 ;; The stack records where we are executing
-(defn- push-frame [fr env] (update-in env [:stack] conj fr))
+(defn- push-frame [env fr] (update-in env [:stack] conj fr))
 (defn- pop-frame  [env]    (update-in env [:stack] pop))
 
 ;; A name is a symbol
@@ -40,9 +42,61 @@
 (def-  errors               :error-stack)
 (defn- errors? [env]        (not-empty (errors env)))
 
-;; Right now, nothing is a macro, because I haven't implemented them
-;; yet
-(defn macro? [& _] false)
+;; A closure is a frozen form of the current namespace, with the stack
+;; recorded for use in debugging
+(defn- mkclosure [env]
+  {:symtab         (symtab env)
+   :captured-stack (stacktrace env)})
+
+;; When activating a closure, we want the symbol table from the
+;; environment overlaid with the closure's symtab. We also want the
+;; closure's entire stack to appear as a single frame.
+(defn- in-closure [env closure]
+  (binds env (symtab closure)))
+
+;; An "Appliable" is a value. It will be a macro or function
+(defprotocol Apply
+  (apply-to [this args env] "Apply arguments to a macro or function"))
+
+;; A Primitive is a built-in function from Clojure. Applying it just
+;; means calling the function.
+(defrecord Primitive [f]
+  Apply
+  (apply-to [this args env]
+    (let [[args env] (eval-vec args env)]
+      (if (errors? env)
+        (break env)
+        [(apply f args) env]))))
+
+(defn- arity-error? [receiver available]
+  (not= (count receiver) (count available)))
+
+(declare interpret)
+
+;; Some environment juggling here to activate the closure from when
+;; the lambda was created.
+(defrecord Lambda [arglist body closure]
+  Apply
+  (apply-to [this args env]
+    (if (arity-error? arglist args)
+      (break (raise (str "Expected " (count arglist) " arguments, got " (count args)) env))
+      (let [env        (in-closure env closure)
+            [args env] (eval-vec args env)]
+        (if (errors? env)
+          (break env)
+          (let [env (binds env (zipmap arglist args))]
+            (if (errors? env)
+              (break env)
+              (interpret body env))))))))
+
+(defn lambda [arglist body closure] (Lambda. arglist body closure))
+
+(comment
+
+
+
+
+  )
 
 ;; Evaluating a form is polymorphic
 (defprotocol Eval
@@ -57,7 +111,7 @@
 (defn- interpret [top env]
   (if (errors? env)
     (break env)
-    (let [env (push-frame (frame top) env)]
+    (let [env (push-frame env (frame top))]
       (let [[val env] (evaluate top env)]
         (if (errors? env)
           (break env)
@@ -74,6 +128,8 @@
       [v env]
       (break (raise (str "Symbol " s " is not defined") env)))))
 
+(defn sym [s ast] (Symbol. s ast))
+
 (defrecord Literal [val ast]
   Eval
   (frame [this]
@@ -81,6 +137,8 @@
 
   (evaluate [this env]
     [val env]))
+
+(defn lit [v ast] (Literal. v ast))
 
 (defn- eval-vec [xs env]
   (reduce
@@ -99,26 +157,22 @@
     (let [[vs env] (eval-vec kvs env)]
       [(apply hash-map vs) env])))
 
-(defn- fcall [f args env]
-  [(apply f args) env])
+(defn mapf [kvs ast] (Map. kvs ast))
 
 (defrecord Statement [hd tl ast]
   Eval
   (frame [this] (mkframe hd tl ast))
   (evaluate [this env]
-    (let [body (find hd env)]
-      (if-not body
+    (let [fval (find hd env)]
+      (if-not fval
         (break (raise (str "Found " hd " in function position, but it is not callable.") env))
-        (if (macro? body)
-          (apply interpret (fcall body tl env))
-          (let [[args env] (eval-vec tl env)
-                [v env]    (fcall body args env)]
-            [v env]))))))
+        (apply-to fval tl env)))))
 
+(defn statement [hd tl ast] (Statement. hd tl ast))
 
 (comment
 
-  (interpret (Map. [(Symbol. 'ofo {}) (Symbol. 'bar {})] {})
+  (interpret (mapf [(sym 'ofo {}) (sym 'bar {})] {})
     empty-environment)
 
   (->> empty-environment
@@ -126,25 +180,35 @@
 
   (->> empty-environment
     (bind 'foo :a)
-    (interpret (Symbol. 'foo {})))
+    (interpret (sym 'foo {})))
 
 
   (->> empty-environment
     (bind 'foo :b)
     (interpret
-      (Map. [(Symbol. 'foo {}) (Literal. 10 {})
-             (Literal. :a {})  (Literal. "this is the day" {})]
+      (mapf [(sym 'foo {}) (lit 10 {})
+             (lit :a {})  (lit "this is the day" {})]
         {})))
 
   (->> empty-environment
-    (bind 'print println)
+    (bind 'print (Primitive. println))
     (bind 'foo :b)
     (interpret
-      (Statement. 'print
-        [(Map. [(Symbol. 'foo {}) (Literal. 10 {})
-                (Literal. :a {})  (Literal. "this is the day" {})]
+      (statement 'print
+        [(mapf [(sym 'foo {}) (lit 10 {})
+                (lit :a {})  (lit "this is the day" {})]
            {})]
         {})))
+
+  (->> empty-environment
+    (bind 'print (Primitive. println))
+    (interpret
+      (statement 'print
+        [(mapf [(sym 'foo {}) (lit 10 {})
+                (lit :a {})  (lit "this is the day" {})]
+           {})]
+        {})))
+
 
 
   )
@@ -163,16 +227,31 @@
     (is (= :a (result
                 (progn
                   (bind 'foo :a)
-                  (interpret (Symbol. 'foo {})))))))
+                  (interpret (sym 'foo {})))))))
 
   (testing "return a map"
     (is (= {:a "this is the day" :b 10}
           (result
             (progn
               (bind 'foo :b)
-              (interpret (Map. [(Symbol. 'foo {}) (Literal. 10 {})
-                                (Literal. :a {})  (Literal. "this is the day" {})]
-                           {})))))))
-  )
+              (interpret (mapf [(sym 'foo {}) (lit 10 {})
+                                (lit :a {})  (lit "this is the day" {})] {}))))))))
+
+(deftest testing-lambdas
+  (testing "lambda at top level"
+    (let [env empty-environment
+          r   (->> env
+                (bind 'foo (lambda '[x] (sym 'x {}) (mkclosure env)))
+                (interpret (statement 'foo [(lit 15 {})] {})))]
+      (is (= 15 (result r)))
+      (is (not (errors? (final-env r))))))
+
+  (let [env empty-environment
+        r   (->> env
+              (bind 'foo (lambda '[x] (sym 'x {}) (mkclosure env)))
+              (interpret (statement 'foo [(sym 'blarg {})] {})))]
+    (is (nil? (result r)))
+    (is (errors? (final-env r)))))
+
 
 (run-tests)
