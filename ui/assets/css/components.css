@@ -1,4 +1,4 @@
-/* 
+/*
     Created on : Jul 17, 2017, 12:31:12 AM
     Author     : Atta-Ur-Rehman Shah (http://attacomsian.com)
 */
@@ -75,7 +75,7 @@ body, button, input, optgroup, select, textarea {
 }
 @media (max-width: 768px){
     .brand {
-        margin-top: 20vh; 
+        margin-top: 20vh;
     }
     .brand h1{
         font-size: 2.5em;
