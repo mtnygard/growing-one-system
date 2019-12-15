@@ -25,22 +25,7 @@
               (interpret (mkmap [(mksym 'foo {}) (mklit 10 {})
                                 (mklit :a {})  (mklit "this is the day" {})] {}))))))))
 
-(deftest testing-lambdas
-  (testing "lambda at top level"
-    (let [env empty-environment
-          r   (->> env
-                (bind 'foo (mklambda '[x] (mksym 'x {}) env))
-                (interpret (mkstatement 'foo [(mklit 15 {})] {})))]
-      (is (= 15 (result r)))
-      (is (not (errors? (final-env r))))))
 
-  (testing "error inside lambda body"
-    (let [env empty-environment
-          r   (->> env
-                (bind 'foo (mklambda '[x] (mksym 'x {}) env))
-                (interpret (mkstatement 'foo [(mksym 'blarg {})] {})))]
-      (is (nil? (result r)))
-      (is (errors? (final-env r))))))
 
 (deftest testing-bindings
   (testing "Empty bindings"
@@ -72,8 +57,60 @@
       (is (result r))
       (is (not (errors? (final-env r))))))  )
 
-;; todo - lambda should capture its environment and return a closure.
-;; The Lambda is evaluated to produce a closure. The closure is
-;; applied to zero or more arguments.
+(deftest testing-lambdas
+  (testing "lambda at top level"
+    (let [r (progn
+              (interpret
+                (mklet [(mksym 'foo {}) (mklambda '[x] (mksym 'x {}) {})]
+                  (mkstatement (mksym 'foo {}) [(mklit 15 {})] {})
+                  {})))]
+      (is (= 15 (result r)))
+      (is (not (errors? (final-env r))))))
+
+  (testing "error inside lambda body"
+    (let [r (progn (interpret
+                     (mklet [(mksym 'foo {}) (mklambda '[x] (mksym 'x {}) {})]
+                       (mkstatement (mksym 'foo {}) [(mksym 'blarg {})] {})
+                       {})))]
+      (is (nil? (result r)))
+      (is (errors? (final-env r)))))
+
+  (testing "lambdas capture their environment when executed"
+    (let [r (progn
+              (interpret
+                (mklet [(mksym 'x {}) (mklit 15 {})
+                        (mksym 'foo {}) (mklambda [] (mksym 'x {}) {})]
+                  (mkstatement (mksym 'foo {}) [] {})
+                  {})))]
+      (is (= 15 (result r)))
+      (is (not (errors? (final-env r)))))
+
+    (let [r (progn
+              (interpret
+                (mklet [(mksym 'x {}) (mklit 15 {})
+                        (mksym 'foo {}) (mklambda [] (mksym 'x {}) {})
+                        (mksym 'x {}) (mklit false {})]
+                  (mkstatement (mksym 'foo {}) [] {})
+                  {})))]
+      (is (= 15 (result r)))
+      (is (not (errors? (final-env r))))))
+
+  (testing "theorems from lambda calculus"
+    (let [r (progn
+              (interpret
+                (mklet [(mksym 't {}) (mklambda '[x y] (mksym 'x {}) {})]
+                  (mkstatement (mksym 't {}) [(mklit 9 {}) (mklit :acorn {})] {})
+                  {})))]
+      (is (= 9 (result r))))
+
+    (let [r (progn
+              (interpret
+                (mkstatement
+                  (mklambda '[x y] (mksym 'x {}) {})
+                  [(mklit 15 {}) (mklit :hazelnut {})]
+                  {})))]
+      (is (not (errors? (final-env r))))
+      (is (= 15 (result r))))))
+
 
 #_(run-tests)

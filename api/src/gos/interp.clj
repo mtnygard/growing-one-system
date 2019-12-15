@@ -94,7 +94,7 @@
 
 ;; A closure is a frozen form of the current namespace, with the stack
 ;; recorded for use in debugging
-(defn- mkclosure [env]
+(defn- closure [env]
   {:symtab         (symtab env)
    :captured-stack (stacktrace env)})
 
@@ -111,9 +111,9 @@
 (defn- arity-error? [receiver available]
   (not= (count receiver) (count available)))
 
-;; Some environment juggling here to activate the closure from when
+;; Some environment juggling here to activate the environment from when
 ;; the lambda was created.
-(defrecord Lambda [arglist body closure]
+(defrecord Closure [arglist body closure]
   Apply
   (apply-to [this args env]
     (if (arity-error? arglist args)
@@ -127,7 +127,18 @@
               (break env)
               (interpret body env))))))))
 
-(defn mklambda [arglist body env] (Lambda. arglist body (mkclosure env)))
+(defn mkclosure [arglist body env] (Closure. arglist body (closure env)))
+
+;; When interpreted, a Lambda creates a Closure.
+(defrecord Lambda [arglist body ast]
+  Eval
+  (frame [this]
+    (mkframe 'Lambda arglist ast))
+
+  (evaluate [this env]
+    [(mkclosure arglist body env) env]))
+
+(def mklambda ->Lambda)
 
 ;; A Primitive is a built-in function from Clojure. Applying it just
 ;; means calling the function.
@@ -156,9 +167,9 @@
   Eval
   (frame [this] (mkframe hd tl ast))
   (evaluate [this env]
-    (let [fval (find hd env)]
-      (if-not fval
-        (break (raise (str "Found " hd " in function position, but it is not callable.") env))
+    (let [[fval env] (evaluate hd env)]
+      (if (errors? env)
+        (break env)
         (apply-to fval tl env)))))
 
 (def mkstatement ->Statement)
