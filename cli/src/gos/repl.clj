@@ -4,7 +4,7 @@
   (:require [clojure.datafy :refer [datafy nav]]
             [clojure.java.io :as io]
             [clojure.pprint :as pp :refer [pprint]]
-            [clojure.spec-alpha2 :as s]
+            [clojure.alpha.spec :as s]
             [clojure.string :as str]
             [clojure.tools.cli :as cli]
             [datomic.api :as d]

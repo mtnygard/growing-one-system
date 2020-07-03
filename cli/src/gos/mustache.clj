@@ -1,6 +1,6 @@
 (ns gos.mustache
   (:require [cljstache.core :refer [render]]
-            [clojure.spec-alpha2 :as s]
+            [clojure.alpha.spec :as s]
             [gos.spec-print :as sprint]))
 
 (s/def ::mustache-schema (s/schema [::mustache]))
