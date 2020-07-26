@@ -37,7 +37,7 @@
 
 ;; "Raising" an error means we stop evaluating
 (defn- push-error [err env] (update-in env [:error-stack] conj err))
-(defn- clear-error [env]    (assoc-in env [:error-stack] []))
+#_(defn- clear-error [env]    (assoc-in env [:error-stack] []))
 (defn- raise [err env]      (push-error {:cause err :at (stacktrace env)} env))
 (def   errors               :error-stack)
 (defn  errors? [env]        (not-empty (errors env)))
@@ -55,11 +55,11 @@
 (defn interpret [top env]
   (if (errors? env)
     (break env)
-    (let [env (push-frame env (frame top))]
-      (let [[val env] (evaluate top env)]
-        (if (errors? env)
-          (break env)
-          [val (pop-frame env)])))))
+    (let [env (push-frame env (frame top))
+          [val env] (evaluate top env)]
+      (if (errors? env)
+        (break env)
+        [val (pop-frame env)]))))
 
 ;; A symbol looks itself up in the environment
 (defrecord Symbol [s ast]
@@ -86,11 +86,11 @@
 
 (defn- eval-vec [xs env]
   (reduce
-    (fn [[vals env] f]
-      (let [[v e] (interpret f env)]
-        [(conj vals v) e]))
-    [[] env]
-    xs))
+   (fn [[vals env] f]
+     (let [[v e] (interpret f env)]
+       [(conj vals v) e]))
+   [[] env]
+   xs))
 
 ;; A closure is a frozen form of the current namespace, with the stack
 ;; recorded for use in debugging
@@ -180,14 +180,14 @@
   (evaluate [this env]
     ;; todo - ensure even number of bindings
     (let [env (reduce
-                (fn [env [k vexpr]]
-                  (if (errors? env)
-                    (break env)
-                    (let [[v env] (interpret vexpr env)]
+               (fn [env [k vexpr]]
+                 (if (errors? env)
+                   (break env)
+                   (let [[v env] (interpret vexpr env)]
                       ;; todo - ensure lhs is a Symbol
-                      (bind (:s k) v env))))
-                env
-                (partition 2 bindings))]
+                     (bind (:s k) v env))))
+               env
+               (partition 2 bindings))]
       (if (errors? env)
         (break env)
         (interpret body env)))))

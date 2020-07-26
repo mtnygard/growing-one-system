@@ -1,7 +1,6 @@
 (ns gos.spec-print
   (:refer-clojure :exclude [print use])
   (:require [clojure.alpha.spec :as s]
-            [clojure.alpha.spec.gen :as gen]
             [clojure.pprint :refer [pprint]]))
 
 (def ^:private spec-printers (atom {}))
