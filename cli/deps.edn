@@ -3,16 +3,16 @@
              org.clojure/tools.cli   {:mvn/version "0.4.2"}
              mvxcvi/puget            {:mvn/version "1.1.2"}
              org.clojure/test.check  {:mvn/version "0.9.0"}
-             org.clojure/spec-alpha2 {:local/root "../spec-alpha2"}
+             org.clojure/spec-alpha2 {:local/root "../vendor/spec-alpha2"}
              cljstache               {:mvn/version "2.0.4"}}
  :aliases   {:dev     {:main-opts   ["-m" "frenpl"]
                        :extra-paths ["dev" "test"]
-                       :extra-deps  {frenpl {:local/root "../frenpl"}}}
+                       :extra-deps  {frenpl {:local/root "../vendor/frenpl"}}}
              :test    {:extra-paths ["test"]
-                       :extra-deps  {com.cognitect/test-runner {:local/root "../test-runner"}}
+                       :extra-deps  {com.cognitect/test-runner {:local/root "../vendor/test-runner"}}
                        :main-opts   ["-m" "cognitect.test-runner"]}
              :repl    {:main-opts ["-m" "gos.repl"]}
-             :uberjar {:extra-deps {mdiin/cambada {:local/root "../cambada"}}
+             :uberjar {:extra-deps {mdiin/cambada {:local/root "../vendor/cambada"}}
                        :main-opts  ["-m" "cambada.uberjar" "-m" "gos.repl" "--app-version" "1.0.1"]}}
  :mvn/repos {"central"        {:url "https://repo1.maven.org/maven2/"}
              "clojars"        {:url "https://repo.clojars.org/"}

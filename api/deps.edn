@@ -1,15 +1,15 @@
 {:paths     ["src" "resources"]
  :deps      {com.datomic/client-cloud    {:mvn/version "0.8.78"}
              com.datomic/datomic-pro     {:mvn/version "0.9.5930"}
-             com.cognitect/pedestal.vase {:local/root "../vase"}
+             com.cognitect/pedestal.vase {:local/root "../vendor/vase"}
              com.cognitect/anomalies     {:mvn/version "0.1.12"}
              re-frame                    {:mvn/version "0.10.6"}
              instaparse                  {:mvn/version "1.4.10"}}
  :aliases   {:dev  {:main-opts   ["-m" "frenpl"]
                     :extra-paths ["dev" "test"]
-                    :extra-deps  {frenpl {:local/root "../frenpl"}}}
+                    :extra-deps  {frenpl {:local/root "../vendor/frenpl"}}}
              :test {:extra-paths ["test"]
-                    :extra-deps  {com.cognitect/test-runner {:local/root "../test-runner"}}
+                    :extra-deps  {com.cognitect/test-runner {:local/root "../vendor/test-runner"}}
                     :main-opts   ["-m" "cognitect.test-runner"]}
              :run  {:main-opts ["-m" "gos.main" "src/config.fern"]
                     :jvm-opts  ["--add-modules" "java.xml.bind"]}}
