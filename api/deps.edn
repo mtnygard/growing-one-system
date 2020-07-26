@@ -13,6 +13,6 @@
                     :main-opts   ["-m" "cognitect.test-runner"]}
              :run  {:main-opts ["-m" "gos.main" "src/config.fern"]
                     :jvm-opts  ["--add-modules" "java.xml.bind"]}}
- :mvn/repos {"central"        {:url "http://repo1.maven.org/maven2/"}
+ :mvn/repos {"central"        {:url "https://repo1.maven.org/maven2/"}
              "clojars"        {:url "https://repo.clojars.org/"}
              "my.datomic.com" {:url "https://my.datomic.com/repo"}}}
