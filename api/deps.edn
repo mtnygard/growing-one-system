@@ -1,7 +1,7 @@
 {:paths     ["src" "resources"]
  :deps      {com.datomic/client-cloud    {:mvn/version "0.8.78"}
              com.datomic/datomic-pro     {:mvn/version "0.9.5930"}
-             com.cognitect/pedestal.vase {:local/root "../../vase"}
+             com.cognitect/pedestal.vase {:local/root "../vase"}
              com.cognitect/anomalies     {:mvn/version "0.1.12"}
              re-frame                    {:mvn/version "0.10.6"}
              instaparse                  {:mvn/version "1.4.10"}}
