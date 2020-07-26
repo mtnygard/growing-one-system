@@ -86,11 +86,11 @@
 
 (defn- eval-vec [xs env]
   (reduce
-    (fn [[vals env] f]
-      (let [[v e] (interpret f env)]
-        [(conj vals v) e]))
-    [[] env]
-    xs))
+   (fn [[vals env] f]
+     (let [[v e] (interpret f env)]
+       [(conj vals v) e]))
+   [[] env]
+   xs))
 
 ;; A closure is a frozen form of the current namespace, with the stack
 ;; recorded for use in debugging
@@ -180,14 +180,14 @@
   (evaluate [this env]
     ;; todo - ensure even number of bindings
     (let [env (reduce
-                (fn [env [k vexpr]]
-                  (if (errors? env)
-                    (break env)
-                    (let [[v env] (interpret vexpr env)]
+               (fn [env [k vexpr]]
+                 (if (errors? env)
+                   (break env)
+                   (let [[v env] (interpret vexpr env)]
                       ;; todo - ensure lhs is a Symbol
-                      (bind (:s k) v env))))
-                env
-                (partition 2 bindings))]
+                     (bind (:s k) v env))))
+               env
+               (partition 2 bindings))]
       (if (errors? env)
         (break env)
         (interpret body env)))))

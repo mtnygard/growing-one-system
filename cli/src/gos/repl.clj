@@ -1,13 +1,12 @@
 (ns gos.repl
   (:gen-class)
   (:refer-clojure :exclude [print])
-  (:require [clojure.datafy :refer [datafy nav]]
+  (:require [clojure.datafy :refer [datafy]]
             [clojure.java.io :as io]
             [clojure.pprint :as pp :refer [pprint]]
             [clojure.alpha.spec :as s]
             [clojure.string :as str]
             [clojure.tools.cli :as cli]
-            [datomic.api :as d]
             [gos.db :as db]
             [gos.exec :as exec]
             [gos.seq :as seq]
@@ -15,8 +14,7 @@
             [gos.table :refer [print-table]]
             gos.mustache
             [gos.parser :as parser])
-  (:import clojure.lang.LineNumberingPushbackReader
-           java.io.StringReader))
+  (:import clojure.lang.LineNumberingPushbackReader))
 
 ;; ----------------------------------------
 ;; Error reporting
@@ -129,10 +127,10 @@
 
 (defn- extract-control-command [input]
   (-> input
-    (str/replace #"[;:\n]" "")
-    str/trim))
+      (str/replace #"[;:\n]" "")
+      str/trim))
 
-(defmulti apply-control-command (fn [state input] (keyword (extract-control-command input))))
+(defmulti apply-control-command (fn [_ input] (keyword (extract-control-command input))))
 (defmethod apply-control-command :quit
   [state _]
   (quit! state))
@@ -198,14 +196,14 @@
 (defn- join-lines [s] (str/replace s #"\n" ""))
 
 (sprint/use ::error
-  (fn [ex]
-    (println "An error was thrown:\n")
-    (println (:cause ex))
-    (println "\nException stack")
-    (print-table (map #(-> %
-                         (update :message join-lines)
-                         (dissoc :at))
-                   (:via ex)))))
+            (fn [ex]
+              (println "An error was thrown:\n")
+              (println (:cause ex))
+              (println "\nException stack")
+              (print-table (map #(-> %
+                                     (update :message join-lines)
+                                     (dissoc :at))
+                                (:via ex)))))
 
 (s/def ::tx-data (s/coll-of #(instance? datomic.db.Datum %)))
 
@@ -226,51 +224,51 @@
 (def ^:private ^:dynamic *dbadapter* nil)
 
 (sprint/use ::ok-value
-  (fn [result]
-    (binding [*dbadapter* (:dbadapter result)]
-      (sprint/print (:value result)))))
+            (fn [result]
+              (binding [*dbadapter* (:dbadapter result)]
+                (sprint/print (:value result)))))
 
 (sprint/use ::multivalue
-  (fn [vs]
-    (doseq [v vs]
-      (sprint/print (datafy v)))))
+            (fn [vs]
+              (doseq [v vs]
+                (sprint/print (datafy v)))))
 
 (sprint/use ::problems-response
-  (fn [result]
-    (doseq [p (:problems result)]
-      (sprint/print (datafy p)))))
+            (fn [result]
+              (doseq [p (:problems result)]
+                (sprint/print (datafy p)))))
 
 (defn- eavta?     [d] (mapv #(nth d %) [0 1 2 3 4]))
 (defn- datom->map [d] (zipmap [:e :a :v :tx :added?] (eavta? d)))
 (defn- attribute-name [e db-adapter] (:db/ident (db/e db-adapter e)))
 
 (sprint/use ::tx-value
-  (fn [result]
-    (let [datom-maps (map datom->map (:tx-data result))
-          datom-maps (map #(update % :a attribute-name *dbadapter*) datom-maps)]
-      (if-not (empty? datom-maps)
-        (print-table datom-maps)
-        (pp/pprint result)))))
+            (fn [result]
+              (let [datom-maps (map datom->map (:tx-data result))
+                    datom-maps (map #(update % :a attribute-name *dbadapter*) datom-maps)]
+                (if-not (empty? datom-maps)
+                  (print-table datom-maps)
+                  (pp/pprint result)))))
 
 (sprint/use ::query-value
-  (fn [result]
-    (let [matched (:query-result result)
-          fields  (mapv name (:query-fields result))
-          fields  (if (empty? fields)
-                    (let [field-count (reduce max 0 (map count matched))]
-                      (map str (range field-count)))
-                    fields)]
-      (print-table (map #(zipmap fields %) matched)))))
+            (fn [result]
+              (let [matched (:query-result result)
+                    fields  (mapv name (:query-fields result))
+                    fields  (if (empty? fields)
+                              (let [field-count (reduce max 0 (map count matched))]
+                                (map str (range field-count)))
+                              fields)]
+                (print-table (map #(zipmap fields %) matched)))))
 
 (defn usage [options-summary]
   (->>
-    ["Interact with your data."
-     ""
-     "Usage: java -jar gos.api-VERSION-standalone.jar [options]"
-     ""
-     "Options:"
-     options-summary]
-    (str/join \newline)))
+   ["Interact with your data."
+    ""
+    "Usage: java -jar gos.api-VERSION-standalone.jar [options]"
+    ""
+    "Options:"
+    options-summary]
+   (str/join \newline)))
 
 (defn error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
@@ -303,7 +301,7 @@
   [f xs]
   (reduce (fn [inner x] (fn [state] (f x (inner state)))) identity xs))
 
-(defn- repl-init [{:keys [eval] :as options}]
+(defn- repl-init [{:keys [eval]}]
   ;; deferred continuation style
   ;; build a chain of evaluations of
   ;; (repl-run-init reader (repl-run-init reader ,,,))
@@ -335,9 +333,6 @@
   (def dbadapter (db/classic datomic-memory-uri))
   (defn p [s]
     (repl-print
-      (repl-eval
-        (exec/initial-state dbadapter)
-        s)))
-
-
-  )
+     (repl-eval
+      (exec/initial-state dbadapter)
+      s))))

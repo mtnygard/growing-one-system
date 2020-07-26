@@ -5,7 +5,7 @@
 (def ^:dynamic *debug-evaluation* nil)
 
 (defn indent-print [{:keys [depth]} m]
-  (dotimes [i (or depth 0)] (print ".."))
+  (dotimes [_ (or depth 0)] (print ".."))
   (println m))
 
 (def safe-inc (fnil inc 0))

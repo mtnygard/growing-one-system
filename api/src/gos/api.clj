@@ -7,7 +7,6 @@
   (i/interceptor
    {:name ::accept
     :enter (fn [{:keys [request] :as ctx}]
-             (let [{:keys [conn dbadapter]} request
-                   world             (-> request :path-params :world)
+             (let [{:keys [_ dbadapter]} request
                    body              (first (vals (select-keys request [:transit-params :json-params :edn-params])))]
                (assoc ctx :response (exec/process (exec/with-input (exec/initial-state dbadapter) body)))))}))
