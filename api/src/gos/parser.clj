@@ -1,7 +1,6 @@
 (ns gos.parser
   (:require [clojure.edn :as edn]
             [gos.date :as date]
-            [gos.problems :refer [with-problems]]
             [gos.seq :refer [sequential-tree]]
             [instaparse.core :as insta]
             [clojure.string :as str]
@@ -45,9 +44,9 @@
     operator-clause  = operator value*
 
     repeat           = <':'>
-    name             = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?]*\"
+    name             = #\"[a-zA-Z_][a-zA-Z0-9_\\-\\?.]*\"
     type             = #\"[a-zA-Z_][a-zA-Z0-9]*\"
-    symbol           = #\"[a-zA_Z_0-9\\?][a-zA_Z_0-9\\?\\-\\$%*]*\"
+    symbol           = #\"[a-zA_Z_0-9\\?][a-zA_Z_0-9\\?\\-\\$%*.]*\"
     string-literal   = #\"\\\"(\\.|[^\\\"])*\\\"\"
     long-literal     = #\"-?[0-9]+\"
     date-literal     = #\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"
@@ -72,29 +71,29 @@
 
 (defn- transform [parse-tree]
   (insta/transform
-    {:input            (fn [& exprs] (ast/->Exprs exprs))
-     :attribute-decl   ast/->Attribute
-     :relation-decl    (fn [_ r & xs] (ast/->Relation r xs))
-     :instance-expr    (fn [& xs] (instance-or-query xs))
-     :instance-clause  (fn [r & xs] (ast/->QueryRelation r xs))
-     :operator-clause  (fn [& pat]  (ast/->QueryOperator pat))
-     :query-expr       (fn [& clauses] (ast/->Query clauses))
-     :map-expr         (fn [& bindings] (ast/->Binding (apply hash-map bindings)))
-     :vector-literal   vector
-     :name             keyword
-     :type             keyword
-     :cardinality      keyword
-     :value            identity
-     :symbol           symbol
-     :constraint       (fn [x & more] (list* (keyword x) more))
-     :constrained-name vector
-     :string-literal   edn/read-string
-     :long-literal     edn/read-string
-     :boolean-literal  edn/read-string
-     :date-literal     date/yyyy-mm-dd
-     :binding          (fn [& xs] (apply hash-map xs))
-     :repeat           (constantly :repeat)
-     :operator         symbol}
+   {:input            (fn [& exprs] (ast/->Exprs exprs))
+    :attribute-decl   ast/->Attribute
+    :relation-decl    (fn [_ r & xs] (ast/->Relation r xs))
+    :instance-expr    (fn [& xs] (instance-or-query xs))
+    :instance-clause  (fn [r & xs] (ast/->QueryRelation r xs))
+    :operator-clause  (fn [& pat]  (ast/->QueryOperator pat))
+    :query-expr       (fn [& clauses] (ast/->Query clauses))
+    :map-expr         (fn [& bindings] (ast/->Binding (apply hash-map bindings)))
+    :vector-literal   vector
+    :name             keyword
+    :type             keyword
+    :cardinality      keyword
+    :value            identity
+    :symbol           symbol
+    :constraint       (fn [x & more] (list* (keyword x) more))
+    :constrained-name vector
+    :string-literal   edn/read-string
+    :long-literal     edn/read-string
+    :boolean-literal  edn/read-string
+    :date-literal     date/yyyy-mm-dd
+    :binding          (fn [& xs] (apply hash-map xs))
+    :repeat           (constantly :repeat)
+    :operator         symbol}
    parse-tree))
 
 ;; this has to match the production rule for `expr` in the grammar above
@@ -103,7 +102,7 @@
 
 (defn- complete-statement? [ast]
   (and (= :input (first ast))
-    (expr-productions (first (second ast)))))
+       (expr-productions (first (second ast)))))
 
 (defn- partial-parses [body]
   (insta/parses grammar body :partial true))
@@ -114,9 +113,9 @@
 ;; this is more sensitive to the grammar structure than I'd like
 (defn command-complete? [body]
   (->> body
-    partial-parses
-    (filter complete-statement?)
-    not-empty))
+       partial-parses
+       (filter complete-statement?)
+       not-empty))
 
 (defn parse [body]
   (let [result (insta/parse grammar body)]

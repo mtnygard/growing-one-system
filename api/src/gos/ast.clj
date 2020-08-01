@@ -32,28 +32,28 @@
 ;; Sanity checks
 (defn assert-has-attributes [nm attrs]
   (assert
-    (not (empty? attrs))
-    (str "Not a relation: " nm)))
+   (seq attrs)
+   (str "Not a relation: " nm)))
 
 (defn assert-sufficient-values [nm attrs vals]
   (assert (= (count attrs) (count vals))
-    (str
-      "Relation " nm " has " (count attrs)
-      " attributes but " (count vals) " values were supplied.")))
+          (str
+           "Relation " nm " has " (count attrs)
+           " attributes but " (count vals) " values were supplied.")))
 
 (defn assert-sufficient-pattern [nm attrs pattern]
   (assert (= (count attrs) (count pattern))
-    (str
-      "Relation " nm " has " (count attrs)
-      " attributes but the query pattern has " (count pattern) " markers.")))
+          (str
+           "Relation " nm " has " (count attrs)
+           " attributes but the query pattern has " (count pattern) " markers.")))
 
 (defn assert-attribute-exists [attrnm actualtype]
   (assert (some? actualtype)
-    (str "Attribute " attrnm " does not exist.")))
+          (str "Attribute " attrnm " does not exist.")))
 
 (defn relation [dbadapter nm] (db/rel dbadapter nm))
 (def  relation-attributes :relation/ordered-attributes)
-(defn relation? [e]      (contains? e relation-attributes))
+#_(defn relation? [e]      (contains? e relation-attributes))
 
 ;; Querying
 (defn- lvar? [x]
@@ -73,7 +73,7 @@
   (mapv vector (repeat esym) attrs lv))
 
 (defn- mask [pred rvals maskvals]
-  (map #(if-not (pred %1 %2) %1) rvals maskvals))
+  (map #(when-not (pred %1 %2) %1) rvals maskvals))
 
 (defn- in-clause [findvars pattern]
   (keep identity (mask #(lvar? %2) findvars pattern)))
@@ -91,10 +91,10 @@
 (defn- merge-query
   [q x]
   (-> q
-    (update :find  concat (remove (set (:find q)) (:find x)))
-    (update :in    concat (:in x))
-    (update :where concat (:where x))
-    (update :args  concat (:args x))))
+      (update :find  concat (remove (set (:find q)) (:find x)))
+      (update :in    concat (:in x))
+      (update :where concat (:where x))
+      (update :args  concat (:args x))))
 
 ;; ========================================
 ;; AST Nodes
@@ -119,7 +119,7 @@
     (when debug/*debug-evaluation*
       (debug/indent-print state "Attribute"))
     @(db/transact (:dbadapter state)
-       (db/mkattr (:dbadapter state) nm type card))))
+                  (db/mkattr (:dbadapter state) nm type card))))
 
 (defrecord Relation [nm attrs]
   AST
@@ -132,10 +132,10 @@
     (when debug/*debug-evaluation*
       (debug/indent-print state "Relation"))
     (mapv #(update
-             (deref (db/transact (:dbadapter state) %))
-             :tx-data
-             seq)
-      (db/mkrel (:dbadapter state) nm attrs))))
+            (deref (db/transact (:dbadapter state) %))
+            :tx-data
+            seq)
+          (db/mkrel (:dbadapter state) nm attrs))))
 
 ;; if :repeat appears in the vals vector, hold the stuff to the left
 ;; constant, and chunk the stuff on the right as needed to fill the #
@@ -157,8 +157,8 @@
       (do
         (assert (= 0 leftover) (str "Not enough values, need a multiple of " missing-values ". Had " leftover " extra values."))
         (map concat
-          (repeat constant-part)
-          (partition-all missing-values (right-of :repeat vals)))))))
+             (repeat constant-part)
+             (partition-all missing-values (right-of :repeat vals)))))))
 
 (defrecord Instance [relnm vals]
   AST
@@ -175,11 +175,11 @@
       (assert-has-attributes relnm attrs)
       (let [vals (unpack-repeats (count attrs) vals)]
         (mapv
-          #(update
-             (deref (db/transact (:dbadapter state) [(db/mkent (:dbadapter state) relnm attrs %)]))
-             :tx-data
-             seq)
-          vals)))))
+         #(update
+           (deref (db/transact (:dbadapter state) [(db/mkent (:dbadapter state) relnm attrs %)]))
+           :tx-data
+           seq)
+         vals)))))
 
 (defrecord Query [clauses]
   AST
@@ -237,8 +237,8 @@
     (when debug/*debug-evaluation*
       (debug/indent-print state "Bindings"))
     (zipmap
-      (keys bindings)
-      (mapv #(evaluate % (debug/indent state)) (vals bindings)))))
+     (keys bindings)
+     (mapv #(evaluate % (debug/indent state)) (vals bindings)))))
 
 ;; Testing membership
 

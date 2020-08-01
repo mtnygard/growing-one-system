@@ -1,7 +1,6 @@
 (ns gos.transit
   (:require [cognitect.transit :as transit])
-  (:import java.io.StringReader
-           java.io.ByteArrayInputStream))
+  (:import java.io.ByteArrayInputStream))
 
 ;; Initial size of a byte buffer for serializing Transit. The buffer
 ;; will grow if needed.

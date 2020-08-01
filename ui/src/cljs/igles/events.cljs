@@ -13,4 +13,3 @@
 (rf/reg-event-fx :window-scrolled
                  (fn-traced [{:keys [db]} _]
                             {:db (db/set-scroll-top db (.. js/document -documentElement -scrollTop))}))
-
