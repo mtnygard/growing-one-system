@@ -5,12 +5,13 @@ relation template content id;
 
 template:
    "digraph G {
-     {{ #nodes }}
-       once per node
-       {{ query-result }}
-     {{ /nodes }}
+     {{#nodes}}
+       {{#query-result}}
+         {{.0}} [ label = {{.1}} ];
+       {{/query-result}}
+     {{/nodes}}
    }"
-   g3;
+   g5;
 
 attr label string one;
 relation node-label id label;
@@ -24,6 +25,6 @@ node-label:
 node-depends a: b c;
 
 {
-  mustache => template ?c g3;
+  mustache => template ?c g5;
   nodes => node-label ?id ?label;
 };
