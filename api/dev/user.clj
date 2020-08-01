@@ -27,7 +27,7 @@
 
            (http/default-interceptors)
            (http/dev-interceptors)
-           
+
            vase.api/start-service
            (:! Throwable t (fe/print-other-exception t path))))
 

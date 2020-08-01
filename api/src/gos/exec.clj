@@ -1,8 +1,6 @@
 (ns gos.exec
   (:require [gos.parser :as parser]
-            [gos.problems :refer [and-then-> with-exception with-problems]]
-            [instaparse.core :as insta]
-
+            [gos.problems :refer [and-then-> with-exception]]
             [gos.ast :as ast]))
 
 ;; these fields are only used during processing of one input
@@ -22,11 +20,11 @@
 
 (defn parse [{:keys [body] :as state}]
   (catching
-    (assoc state :parsed (parser/parse body))))
+   (assoc state :parsed (parser/parse body))))
 
 (defn- execute [{:keys [parsed] :as state}]
   (assoc state :value
-    (ast/evaluate parsed state)))
+         (ast/evaluate parsed state)))
 
 (defn- respond [state] state)
 
@@ -43,7 +41,7 @@
 (defn process
   [start-state]
   (and-then-> (cleanse start-state)
-    (parse)
-    (analyze)
-    (execute)
-    (respond)))
+              (parse)
+              (analyze)
+              (execute)
+              (respond)))

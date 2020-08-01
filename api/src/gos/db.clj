@@ -1,12 +1,10 @@
 (ns gos.db
-  (:require [clojure.edn :as edn]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [datomic.api :as dclassic]
             [datomic.client.api :as dclient]
             [fern :as f]
             [gos.char :as char]
             [gos.debug :as debug]
-            [gos.seq :refer [conjv]]
             [io.pedestal.interceptor :as i]))
 
 ;; Kernel attributes
@@ -83,7 +81,7 @@
    (let [_    (dclassic/create-database uri)
          conn (dclassic/connect uri)
          _    @(dclassic/transact conn relation-attributes)]
-      (classic uri conn)))
+     (classic uri conn)))
   ([uri conn]
    (->DClassic uri conn)))
 
@@ -120,7 +118,7 @@
 
 (defmulti derive-constraint (fn [_ [[op & _]]] op))
 (defmethod derive-constraint :in
-  [dbadapter [[_ target-relation]]]
+  [_ [[_ target-relation]]]
   {:attribute/in target-relation})
 
 (defn- derive-type
@@ -130,10 +128,10 @@
         original   (->map (e dbadapter f))]
     (assert (attribute-exists? dbadapter f) (str "Attribute " f  " not found"))
     (merge (dissoc original :db/id)
-      {:db/ident          to
-       :attribute/derives f}
-      (when constraint
-        (derive-constraint dbadapter constraint)))))
+           {:db/ident          to
+            :attribute/derives f}
+           (when constraint
+             (derive-constraint dbadapter constraint)))))
 
 (defn- derived-types
   "Make copies of the attributes used in this relation."
@@ -148,7 +146,7 @@
 
 ;; API
 
-(defn mkattr [dbadapter nm ty card & options]
+(defn mkattr [dbadapter nm ty card & _]
   {:pre [(keyword? nm) (keyword? ty) (keyword? card)]}
   (if (attribute-exists? dbadapter nm)
     [(update-attribute nm ty card)]
@@ -167,11 +165,10 @@
 (defn- member-of-unary-relation?
   [dbadapter reln val]
   (let [unary-attr (first (attr-names reln))]
-    (not
-      (empty?
-        (q dbadapter
-          '[:find ?e :in $ ?r ?a ?v :where [?e :entity/relation ?r] [?e ?a ?v]]
-          [reln unary-attr val])))))
+    (seq
+     (q dbadapter
+        '[:find ?e :in $ ?r ?a ?v :where [?e :entity/relation ?r] [?e ?a ?v]]
+        [reln unary-attr val]))))
 
 (defn- unify-attr [dbadapter attr-nm val]
   (let [a (e dbadapter attr-nm)]
@@ -183,7 +180,7 @@
 (defn mkent [dbadapter nm attrs vals]
   {:pre [(keyword? nm)]}
   (assoc (into {} (map #(unify-attr dbadapter %1 %2) attrs vals))
-    :entity/relation nm))
+         :entity/relation nm))
 
 (defn attr-type [dbadapter attr-nm]
   {:pre [(keyword? attr-nm)]}
@@ -204,9 +201,9 @@
   (-interceptor [_]
     (let [adapter (mkadapter config)]
       (i/map->Interceptor
-        {:enter
-         (fn [ctx]
-           (update ctx :request assoc :dbadapter adapter))}))))
+       {:enter
+        (fn [ctx]
+          (update ctx :request assoc :dbadapter adapter))}))))
 
 ;; Define a new fern "literal" called `gos.db/adapter`. Use instead
 ;; of `vase.datomic.cloud/client` or `vase.datomic/connection`

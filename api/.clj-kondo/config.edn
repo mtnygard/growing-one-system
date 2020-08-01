@@ -1,0 +1,3 @@
+{:lint-as {gos.problems/and-then-> clojure.core/->
+           gos.interp/def-         clojure.core/def}
+ :linters {:unresolved-symbol {:exclude [(gos.responses/http-statuses)]}}}

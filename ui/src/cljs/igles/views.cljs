@@ -206,7 +206,7 @@
 
 ;; Create a new World
 
-(defn create-world-panel 
+(defn create-world-panel
   []
   (let [world-name (r/atom nil)]
     (fn []
