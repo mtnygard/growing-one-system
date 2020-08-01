@@ -2,5 +2,5 @@
 .nrepl-port
 .rebel_readline_history
 node_modules
-*/.calva
-*/.clj-kondo
+**/.calva
+**/.clj-kondo
