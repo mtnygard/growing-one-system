@@ -112,5 +112,17 @@
       (is (not (errors? (final-env r))))
       (is (= 15 (result r))))))
 
+(deftest special-forms
+  (testing "receive their arguments unevaluated"
+    (let [r (progn
+              (interpret
+                (mklet [(mksym 'm {})
+                        (mkspecial (mksym 'if {}) [(mksym 'form {})] (mkstatement (mksym 'count {}) (mksym 'form {})))]
+                  {}
+                  )))]
+      (is (not (errors? (final-env r))))
+      )
+    )
+  )
 
-#_(run-tests)
+(run-tests)
