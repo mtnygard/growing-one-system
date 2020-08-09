@@ -456,6 +456,96 @@ animal ?name, animal-body ?name ?large true;
 Oh, as you can see in this query, clauses don't have to start on new
 lines. It's just easier to read that way most of the time.
 
+# Retracting Facts
+
+So far we've seen how to add attributes, relations over those attributes, and
+how to generate relations. But what if we make a mistake?
+
+We can use the relation name, with a slight change, to retract a fact that used
+to be true but isn't true any more.
+
+Suppose Zeke the intern zoologist saw a capybara in Chicago, and deduced that their habitat
+includes the windy city.
+
+```
+animal "capybara";
+animal-habitat "capybara" "Chicago";
+```
+
+Later Zeke realizes that the oversized rodent was on the lam. To remove his
+embarassing entry, Zeke would enter:
+
+```
+-animal-habitat "capybara" "Chicago";
+```
+
+This will _retract_ the fact. It will no longer appear in query results.
+
+(Of course, if you only ever run with in-memory mode, then you just edit your
+input files to remove the offending entry before processing.)
+
+While traveling in West Virginia, our intrepid intern learns all about the
+mothman and writes the following entries:
+
+```
+animal "mothman";
+animal-habitat "mothman" "United States";
+animal-habitat "mothman" "West Virginia";
+animal-habitat "mothman" "Ben's Bar and Grill";
+```
+
+After the moonshine wears off, Zeke realizes he needs to clear his head, and his
+notes. To remove all traces of the prophetic beast, he runs:
+
+```
+-animal-habitat "mothman" ?hab;
+-animal "mothman";
+```
+
+The first statement uses a logic variable to form a query. All tuples returned
+by that query will be removed. Note that a retraction query can _only_ operate
+on one relation at a time. This will always be the first relation mentioned.
+Successive relations can be named in order to join with them, but they will not
+be altered. That's why the second statement is needed to remove the erroneous
+entry.
+
+# Identity Attributes
+
+It would be tedious to update facts by retracting one tuple then asserting
+another. The usual case for this is when an attribute defines the unique
+identity of some real-world entity. For this, we can form "identity" attributes:
+
+```
+attr id symbol one identity;
+```
+
+The optional keyword "identity" informs us that any time we see a particular
+value of the `id` attribute, it should always mean the same tuple.
+
+This is useful when we work with templates for output formatting. When we name a
+template, we want that name to be unique, so new assertions about the contents
+of the template replace the older facts.
+
+For example:
+
+```
+attr template-id symbol one identity;
+attr template-contents string one;
+
+relation template template-id template-contents;
+
+template index "contents of the index page";
+template index "hello, world";
+```
+
+In this case, if we query for the template:
+
+```
+template index ?contents;
+```
+
+We should get one tuple back.
+
 # Controlling the REPL
 
 There are a small handful of "commands" that change the behavior of
