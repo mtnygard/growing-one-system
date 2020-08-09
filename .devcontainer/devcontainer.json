@@ -2,6 +2,8 @@
         "name": "Java 14",
         "image": "mtnygard/devcontainer-clojure",
 
+        "postCreateCommand": "yum install -y python3-pip && pip install pre-commit && pre-commit install",
+
         "settings": {
                 "terminal.integrated.shell.linux": "/bin/bash",
                 "java.home": "/usr/java/openjdk-14",
