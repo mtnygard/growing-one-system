@@ -9,23 +9,6 @@ Knowledge management system
 If you just want to try the examples from [Some Commands, Some Queries](#making-a-model) below, you can download a standalone jar file from the
 [releases](https://github.com/mtnygard/growing-one-system/releases) tab.
 
-## Local Checkouts
-
-This application uses a number of pre-release libraries and personal
-forks. You will need to check out the following repositories in the
-parent directory that contains this repository:
-
-    git clone git@github.com:mtnygard/vase
-    git clone git@github.com:jez/pandoc-sidenote
-    git clone git@github.com:mtnygard/fern
-    git clone git@github.com:clojure/spec-alpha2
-    git clone git@github.com:cognitect/test-runner
-    git clone git@github.com:mtnygard/frenpl
-    git clone git@github.com:mdiin/cambada
-
-If you are missing any of these, you'll get an error like "Error
-building classpath. Manifest type not detected..."
-
 ## Repository Hygiene
 
 We use [Pre-commit](https://pre-commit.com/) to manage a lot of
@@ -61,12 +44,6 @@ assets.
 
 The API layer is built with Clojure. Install it on Linux, macOS, or
 WSL according to the [instructions at Clojure.org](https://clojure.org/guides/getting_started).
-
-## Atomist
-
-A variety of housekeeping tasks will be performed by "software delivery machines" created using [Atomist](atomist.com). See the repositories under [Igg-less](https://github.com/igg-less) for details.
-
-You won't be able to run these machines directly. They're part of the infrastructure for running the main project and site.
 
 # Try It Out
 
