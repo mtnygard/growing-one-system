@@ -1,0 +1,9 @@
+{:paths     ["src" "resources"]
+ :deps      {gos.api                 {:local/root "../api"}
+             clojupyter {:mvn/version "0.3.0"}
+             }
+ :aliases   {:depstar
+             {:extra-deps
+              {seancorfield/depstar {:mvn/version "0.3.0"}}}}
+ :mvn/repos {"central"        {:url "https://repo1.maven.org/maven2/"}
+             "clojars"        {:url "https://repo.clojars.org/"}}}
